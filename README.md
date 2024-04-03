@@ -1,71 +1,50 @@
-# dango README
+# dango 🍡
 
-This is the README for your extension "dango". After writing up a brief description, we recommend including the following sections.
+**dango** is a vscode extension meant to act as an intelligent co-collaborator on your creative programming projects. we can ofc change the name but i thought it'd be a cute filler name for the time being.
 
-## Features
+## getting started
+see: [the entire "getting started" section](https://code.visualstudio.com/api/get-started/your-first-extension) from the vscode extension api docs
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+learn what commands are, activation, deactivation.
 
-For example if there is an image subfolder under your extension project workspace:
+### the language is typescript
 
-\!\[feature X\]\(images/feature-x.png\)
+i chose to build it in **typescript**, which is a strongly typed version of javascript. this means we must include explicit types on any parameters passed into to functions.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+for example, javascript might say `function myFunction(catName)` and typescript `function myFunction(catName: string)`. then, any usage of `myFunction` with a `catName` that isn't a string will error. this is to ensure our repo stays readable!
 
-## Requirements
+### important files
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+```
+- DANGO
+  - .vscode
+  - node_modules
+  - src
+    - test
+      - extension.test.ts
+    - extension.ts
+    - utils.ts
+  - .eslintrc.json
+  - .gitignore
+  - .vscodeignore
+  - CHANGELOG.md
+  - package-lock.json
+  - package.json
+  - README.md
+  - tsconfig.json
+  - vscode-extension-quickstart.md
+```
 
-## Extension Settings
+inside **src** is the bulk of the code we will modify:
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+- **extension.ts** is the base of operations; it's where we define new commands (e.g. "Dango: View Files") and the corresponding code it runs (e.g. actually viewing the files in the codebase). note that when we add new commands, we need to also add them to **package.json**.
+- **utils.ts** is a file for helper functions i made to simplify extension.ts. we import from utils.ts into extension.ts.
+- **extension.test.ts** came with the automatic setup, so we can use it for testing at some point or delete it.
 
-For example:
+### previewing & debugging
 
-This extension contributes the following settings:
+to run the code, hit **run > start debugging** or f5. this should bring up a second vscode window which should have the extension "installed". in the second window, hit **ctrl + shift + p** to open the "command palette" where you can search for extensions. you should be able to type "dango" to find the currently implemented commands.
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+me testing "view files" and "add file":
 
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+https://github.com/cnnmon/dango/assets/20329981/fab43136-1579-4e3f-9796-3f304d329ce2
