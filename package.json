@@ -11,7 +11,7 @@
   ],
   "enabledApiProposals": [
     "languageModels"
-],
+  ],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {

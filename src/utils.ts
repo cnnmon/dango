@@ -2,21 +2,21 @@ import * as vscode from 'vscode';
 
 // Prints all files in the current workspace, excluding node_modules
 async function viewFiles() {
-	const outputChannel = vscode.window.createOutputChannel("Project Hierarchy");
-	outputChannel.clear(); // Clear previous output
-	outputChannel.show(true); // Bring the Output panel to focus
-	const pattern = '**/*'; // Adjust this pattern as needed
+  const outputChannel = vscode.window.createOutputChannel("Project Hierarchy");
+  outputChannel.clear(); // Clear previous output
+  outputChannel.show(true); // Bring the Output panel to focus
+  const pattern = '**/*'; // Adjust this pattern as needed
 
-	try {
+  try {
     const files = await vscode.workspace.findFiles(pattern, '**/node_modules/**', 500); // Exclude node_modules, limit to 500 files
     files.forEach(file => {
       outputChannel.appendLine(file.fsPath); 
     });
-	} catch (error) {
-		outputChannel.appendLine(`Error listing project files: ${error}`);
-	}
+  } catch (error) {
+    outputChannel.appendLine(`Error listing project files: ${error}`);
+  }
 
-	outputChannel.appendLine('Project Hierarchy view complete!');
+  outputChannel.appendLine('Project Hierarchy view complete!');
 }
 
 // Creates a new file in the current working directory
