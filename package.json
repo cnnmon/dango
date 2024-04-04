@@ -40,7 +40,7 @@
     "views": {
       "dango-chat": [
         {
-          "id": "dangochat",
+          "id": "dango.chat",
           "type": "webview",
           "name": "Chat"
         }

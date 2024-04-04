@@ -9,11 +9,11 @@ export function activate(context: vscode.ExtensionContext) {
 
   let wakeupCommand = vscode.commands.registerCommand('dango.wakeup', () => {
     vscode.window.showInformationMessage('Dango is waking up!');
-    vscode.commands.executeCommand("dangochat.focus");
+    vscode.commands.executeCommand("dango.chat.focus");
   });
   
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider("dangochat", chatPanel),
+    vscode.window.registerWebviewViewProvider("dango.chat", chatPanel),
     wakeupCommand
   );
 }
