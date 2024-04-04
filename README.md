@@ -16,30 +16,33 @@ for example, javascript might say `function myFunction(catName)` and typescript 
 ### important files
 
 ```
-- DANGO
-  - .vscode
-  - node_modules
-  - src
-    - test
-      - extension.test.ts
+- DANGO/
+  - src/
+    - chat/
+      - ChatPanel.ts
     - extension.ts
     - utils.ts
-  - .eslintrc.json
-  - .gitignore
-  - .vscodeignore
-  - CHANGELOG.md
-  - package-lock.json
+  - web/
+    - src/
+      - App.tsx
+      - index.css
+      - index.html
+      - index.tsx
   - package.json
-  - README.md
-  - tsconfig.json
-  - vscode-extension-quickstart.md
+  - README.md (you are here!)
 ```
 
-inside **src** is the bulk of the code we will modify:
+inside **src** is the core vs code extension, and where we'll usually interact with the extension api:
 
 - **extension.ts** is the base of operations; it's where we define new commands (e.g. "Dango: View Files") and the corresponding code it runs (e.g. actually viewing the files in the codebase). note that when we add new commands, we need to also add them to **package.json**.
 - **utils.ts** is a file for helper functions i made to simplify extension.ts. we import from utils.ts into extension.ts.
-- **extension.test.ts** came with the automatic setup, so we can use it for testing at some point or delete it.
+
+inside **web** is the React components we'll use as "webviews" (see: [webview api](https://code.visualstudio.com/api/extension-guides/webview)) inside our extension. it's a pretty generic react app, so highly recommend checking out [their own docs which are very good](https://react.dev/learn) to get started.
+
+- **index.tsx / index.html / index.css** are app wrappers, which you probably don't need to touch the majority of the time
+- **App.tsx** is the first page of our React app, and is what shows up on our extension panel currently; we can add more of these in the future to create more pages
+
+![image](https://github.com/cnnmon/dango/assets/20329981/b2c5f540-e6bb-4f9c-8450-b24d750dd170)
 
 ### previewing & debugging
 
