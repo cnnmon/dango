@@ -1,24 +1,21 @@
 import * as vscode from 'vscode';
-import { viewFiles, addFile } from './utils';
+import { ChatPanel } from './chat/ChatPanel';
 
-/**
- * Activate is called the very first time any command is executed.
- * Inside, you can register command names => the code that should be executed for each command.
- */
+// Activate is called the very first time any command is executed.
+// Inside, you can register command names => the code that should be executed for each command.
 export function activate(context: vscode.ExtensionContext) {
   console.log('extension "dango" is now active!');
+  const chatPanel = new ChatPanel(context.extensionUri);
 
-  let viewFilesCommand = vscode.commands.registerCommand('dango.viewFiles', () => {
-    viewFiles();
-  });
-
-  let addFileCommand = vscode.commands.registerCommand('dango.addFile', () => {
-    addFile();
+  let wakeupCommand = vscode.commands.registerCommand('dango.wakeup', () => {
+    vscode.window.showInformationMessage('Dango is waking up!');
+    vscode.commands.executeCommand("dangochat.focus");
   });
   
-  // Add to a list of disposables which are disposed when this extension is deactivated.
-  context.subscriptions.push(viewFilesCommand);
-  context.subscriptions.push(addFileCommand);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider("dangochat", chatPanel),
+    wakeupCommand
+  );
 }
 
 export function deactivate() {}

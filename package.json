@@ -12,7 +12,6 @@
   "enabledApiProposals": [
     "languageModels"
   ],
-  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -23,8 +22,30 @@
       {
         "command": "dango.addFile",
         "title": "Dango: Add File"
+      },
+      {
+        "command": "dango.wakeup",
+        "title": "Dango: Wakeup"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dango-chat",
+          "title": "Dango",
+          "icon": "assets/panda.svg"
+        }
+      ]
+    },
+    "views": {
+      "dango-chat": [
+        {
+          "id": "dangochat",
+          "type": "webview",
+          "name": "Chat"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
