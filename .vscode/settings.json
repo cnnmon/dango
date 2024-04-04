@@ -7,12 +7,27 @@
         "**/CVS": true,
         "**/.DS_Store": true,
         "**/Thumbs.db": true,
-        "out": true
+        "out": true,
+        "web/src/App.css": true,
+        "web/src/App.js": true,
+        "web/src/App.js.map": true,
+        "web/src/App.test.js": true,
+        "web/src/App.test.js.map": true,
+        "web/src/App.test.tsx": true,
+        "web/src/.postcssrc": true
     },
     "search.exclude": {
         "out": true // set this to false to include "out" folder in search results
     },
     // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
     "typescript.tsc.autoDetect": "off",
-    "hide-files.files": []
+    "hide-files.files": [
+        "web/src/App.css",
+        "web/src/App.js",
+        "web/src/App.js.map",
+        "web/src/App.test.js",
+        "web/src/App.test.js.map",
+        "web/src/App.test.tsx",
+        "web/src/.postcssrc"
+    ]
 }
