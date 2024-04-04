@@ -36,7 +36,7 @@ inside **src** is the core vs code extension, and where we'll usually interact w
 
 - **extension.ts** is the base of operations; it's where we define new commands (e.g. "Dango: View Files") and the corresponding code it runs (e.g. actually viewing the files in the codebase). note that when we add new commands, we need to also add them to **package.json**
 - **utils.ts** is a file for helper functions i made to simplify extension.ts. we import from utils.ts into extension.ts
-- **ChatPanel.ts** is a class that enables us to use webview (basically a "window" in vs code)
+- **ChatPanel.ts** is a class that enables us to use a customized webview (basically a "window" in vs code)
 
 inside **web** is the React components we'll use as "webviews" (see: [webview api](https://code.visualstudio.com/api/extension-guides/webview)) inside our extension. it's a pretty generic react app, so highly recommend checking out [their own docs which are very good](https://react.dev/learn) to get started.
 
