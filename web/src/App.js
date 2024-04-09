@@ -1,4 +1,3 @@
-"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 function App() {
     return (<div className="bg-gradient-to-r from-blue-600 to-purple-500 p-10">
