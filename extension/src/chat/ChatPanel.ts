@@ -27,8 +27,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
       </head>
       <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
-        <div id="root"></div>
-        <script src="${scriptUri}"></script>
+        <script nonce="${nonce}" src="${scriptUri}"></script>
       </body>
     </html>
     `;

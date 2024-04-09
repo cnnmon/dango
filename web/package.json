@@ -19,7 +19,7 @@
   "source": "src/index.html",
   "scripts": {
     "start": "parcel",
-    "build": "parcel build",
+    "build": "parcel build src/index.js --no-content-hash",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
