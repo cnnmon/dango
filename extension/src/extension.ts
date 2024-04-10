@@ -11,6 +11,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage('Dango is waking up!');
     vscode.commands.executeCommand("dango.chat.focus");
   });
+
+  chatPanel.onDidReceiveMessage(
+    chatPanel.receivePanelMessage.bind(chatPanel)
+  );
   
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("dango.chat", chatPanel),
