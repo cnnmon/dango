@@ -18,10 +18,8 @@
   },
   "source": "src/index.html",
   "scripts": {
-    "start": "parcel",
-    "build": "parcel build src/index.js --no-content-hash",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "parcel src/index.html",
+    "build": "rm -rf dist/ && parcel build src/index.html && sh ./remove-hash.sh"
   },
   "eslintConfig": {
     "extends": [
