@@ -26,6 +26,10 @@
       {
         "command": "dango.wakeup",
         "title": "Dango: Wakeup"
+      },
+      {
+        "command": "dango.naruto",
+        "title": "Dango: Naruto"
       }
     ],
     "viewsContainers": {

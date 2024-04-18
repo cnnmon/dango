@@ -34,6 +34,10 @@ export class ChatPanel implements vscode.WebviewViewProvider {
     this.webview.html = this._getHtmlForWebview(this.webview);
   }
 
+  public postMessageToWebview(message: unknown) {
+    this.webview?.postMessage(message);
+  }
+
   private _getHtmlForWebview(webview: vscode.Webview) {
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "web", "dist", "index.js"));
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "web", "dist", "index.css"));
@@ -52,15 +56,9 @@ export class ChatPanel implements vscode.WebviewViewProvider {
       </head>
       <body>
         <div id="root"></div>
-        <h1>Chat</h1>
+        <h1>Chazt</h1>
         <script nonce="${nonce}">
           const vscode = acquireVsCodeApi();
-          window.onload = () => {
-            vscode.postMessage({
-              'type': 'message',
-              'value': 'Hello webview!!!'
-            });
-          }
         </script>
         <script nonce="${nonce}" src="${scriptUri}"></script>
       </body>
