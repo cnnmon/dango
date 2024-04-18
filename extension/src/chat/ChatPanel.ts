@@ -1,16 +1,22 @@
 import * as vscode from 'vscode';
 
 export class ChatPanel implements vscode.WebviewViewProvider {
-  constructor(private readonly _extensionUri: vscode.Uri) { }
+  constructor(private readonly _extensionUri: vscode.Uri) {}
 
   public resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken) {
-    webviewView.webview.options = {
+    const webview = webviewView.webview;
+
+    webview.options = {
       // Allow scripts in the webview
       enableScripts: true,
       localResourceRoots: [this._extensionUri],
     };
 
-    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+    webview.html = this._getHtmlForWebview(webview);
+
+    webview.onDidReceiveMessage((data) => {
+      vscode.window.showInformationMessage(data.text);
+    });
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {
