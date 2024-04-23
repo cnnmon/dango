@@ -45,20 +45,27 @@ export class ChatPanel implements vscode.WebviewViewProvider {
     // Use a nonce to whitelist which scripts can be run
     const nonce = getNonce();
 
+    const envVariables = {
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    }
+
+    const csp = `default-src 'none'; img-src ${webview.cspSource} https:; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; connect-src https://api.openai.com;`;
+
     return `<!DOCTYPE html>
     <html lang="en">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline';">
+        <meta http-equiv="Content-Security-Policy" content="${csp}">
         <title>Chat</title>
         <link rel="stylesheet" href="${styleUri}" />
       </head>
       <body>
         <div id="root"></div>
-        <h1>Chazt</h1>
         <script nonce="${nonce}">
           const vscode = acquireVsCodeApi();
+          const env = JSON.parse('${JSON.stringify(envVariables)}');
+          window.env = env;
         </script>
         <script nonce="${nonce}" src="${scriptUri}"></script>
       </body>
