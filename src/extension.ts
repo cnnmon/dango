@@ -11,17 +11,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage('dango is waking up!');
     vscode.commands.executeCommand("dango.chat.focus");
   });
-
-  const narutoCommand = vscode.commands.registerCommand('dango.naruto', () => {
-    chatPanel.postMessageToWebview({
-      type: "naruto",
-      value: "naruto"
-    });
-  });
   
   context.subscriptions.push(
     webviewDisposable,
-    narutoCommand,
     wakeupCommand
   );
 }

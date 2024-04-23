@@ -1,14 +1,15 @@
 import * as vscode from 'vscode';
+import { readDesignDoc, addFile } from '../utils';
 
 export class ChatPanel implements vscode.WebviewViewProvider {
-  constructor(private readonly _extensionUri: vscode.Uri) { }
-
   private readonly disposables: vscode.Disposable[] = [];
   private messageEmitter = new vscode.EventEmitter<unknown>();
   readonly onDidReceiveMessage = this.messageEmitter.event;
   private webview: vscode.WebviewView["webview"] | undefined;
 
-  public resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken) {
+  constructor(private readonly _extensionUri: vscode.Uri) { }
+
+  public async resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken) {
     this.webview = webviewView.webview;
     this.webview.options = {
       enableScripts: true,
@@ -27,24 +28,48 @@ export class ChatPanel implements vscode.WebviewViewProvider {
       })
     );
 
-    this.onDidReceiveMessage((message) => {
-      this.receivePanelMessage(message);
+    this.onDidReceiveMessage((message: {
+      type: string;
+      value?: string | number | { code: string, filename: string };
+    }) => {
+      switch (message.type) {
+        case "readDesignDoc":
+          readDesignDoc().then((result) => {
+            this.postMessageToWebview({
+              type: "readDesignDoc",
+              value: result
+            });
+          });
+          break;
+        case "addFile":
+          const { code, filename } = message.value as { code: string, filename: string };
+          addFile(filename, code).then(() => {
+            this.postMessageToWebview({
+              type: "addFile",
+              value: message.value
+            });
+          })
+        default:
+          vscode.window.showInformationMessage(`Received message: ${JSON.stringify(message)}`);
+          break;
+      }
     });
 
-    this.webview.html = this._getHtmlForWebview(this.webview);
+    this.webview.html = await this._getHtmlForWebview(this.webview, context);
   }
 
   public postMessageToWebview(message: unknown) {
     this.webview?.postMessage(message);
   }
 
-  private _getHtmlForWebview(webview: vscode.Webview) {
+  private async _getHtmlForWebview(webview: vscode.Webview, context: vscode.WebviewViewResolveContext): Promise<string> {
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "web", "dist", "index.js"));
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "web", "dist", "index.css"));
 
     // Use a nonce to whitelist which scripts can be run
     const nonce = getNonce();
 
+    // Fetch initial state and append it to environment variables
     const envVariables = {
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     }
@@ -71,10 +96,6 @@ export class ChatPanel implements vscode.WebviewViewProvider {
       </body>
     </html>
     `;
-  }
-
-  async receivePanelMessage(rawMessage: unknown) {
-    vscode.window.showInformationMessage(`Received message: ${JSON.stringify(rawMessage)}`);
   }
 }
 
