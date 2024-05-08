@@ -24,8 +24,8 @@
         "title": "Dango: Add File"
       },
       {
-        "command": "dango.wakeup",
-        "title": "Dango: Wakeup"
+        "command": "dango.find",
+        "title": "Dango: Find"
       },
       {
         "command": "dango.naruto",

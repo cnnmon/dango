@@ -1,3 +1,27 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+  background-color: white;
+  font-size: 0.80rem !important;
+}
+
+a {
+  text-decoration: underline;
+}
+
+.submit-button {
+  font-size: 0.75rem !important;
+}
+
+.subtitle {
+  font-size: 0.75rem !important;
+  color: #878787;
+}
+
+.disabled {
+  color: #d1d1d1;
+  /* slash through text */
+  text-decoration: line-through;
+}

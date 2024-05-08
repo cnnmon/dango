@@ -2,19 +2,19 @@ import * as vscode from 'vscode';
 import { ChatPanel } from './chat/ChatPanel';
 
 export function activate(context: vscode.ExtensionContext) {
-  vscode.window.showInformationMessage('dango is now active!?');
+  vscode.window.showInformationMessage('🍡 is now active!');
 
   const chatPanel = new ChatPanel(context.extensionUri);
   const webviewDisposable = vscode.window.registerWebviewViewProvider("dango.chat", chatPanel);
 
-  const wakeupCommand = vscode.commands.registerCommand('dango.wakeup', () => {
-    vscode.window.showInformationMessage('dango is waking up!');
+  const findCommand = vscode.commands.registerCommand('dango.find', () => {
+    vscode.window.showInformationMessage("you've found dango!");
     vscode.commands.executeCommand("dango.chat.focus");
   });
   
   context.subscriptions.push(
     webviewDisposable,
-    wakeupCommand
+    findCommand
   );
 }
 
