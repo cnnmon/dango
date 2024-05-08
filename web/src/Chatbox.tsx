@@ -26,6 +26,34 @@ function NavButton({ currentStepIdx, steps, handleStepChange, direction }: {
   );
 }
 
+function StepFooter({ currentStepIdx, steps, handleStepChange, handleDesignDocGeneration }: {
+  currentStepIdx: number,
+  steps: Step[],
+  handleStepChange: (newStep: number) => void,
+  handleDesignDocGeneration: () => void,
+}) {
+  if (steps.length === 0) {
+    return (
+      <button className="subtitle text-center w-full" onClick={handleDesignDocGeneration}>
+        "Help me create a design doc!"
+      </button>
+    )
+  }
+
+  return (
+    <>
+      <p className="subtitle text-center">
+        You're on <b>Step {currentStepIdx + 1}: {steps[currentStepIdx] && ellipses(steps[currentStepIdx].description, 10)}</b>.
+      </p>
+
+      <div className="flex flex-row w-full justify-between gap-2 mt-2">
+        <NavButton currentStepIdx={currentStepIdx} steps={steps} handleStepChange={handleStepChange} direction="prev" />
+        <NavButton currentStepIdx={currentStepIdx} steps={steps} handleStepChange={handleStepChange} direction="next" />
+      </div>
+    </>
+  );
+}
+
 export default function Chatbox({
   messages,
   currentStepIdx,
@@ -33,9 +61,10 @@ export default function Chatbox({
   isDangoLoading,
   handleUserMessage,
   handleStepChange,
-  messagesEndRef,
+  handleDesignDocGeneration,
   textareaValue,
   setTextareaValue,
+  messagesEndRef,
 }: {
   messages: Message[],
   currentStepIdx: number,
@@ -45,11 +74,11 @@ export default function Chatbox({
   setTextareaValue: React.Dispatch<React.SetStateAction<string>>,
   handleUserMessage: () => void,
   handleStepChange: (newStep: number) => void,
+  handleDesignDocGeneration: () => void,
   messagesEndRef: React.RefObject<HTMLDivElement>,
 }) {
   return (
     <>
-      {/* allow \n to create new lines in the chatbox */}
       <div className="flex flex-col gap-2 mb-2 h-[70vh] max-h-[70vh] overflow-y-auto">
         {messages.map((message, idx) => (
           <div key={idx} className={`flex flex-row whitespace-pre-wrap items-center gap-2 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
@@ -76,13 +105,13 @@ export default function Chatbox({
         {isDangoLoading ? "🍡 is thinking..." : "Submit"}
       </button>
 
-      <p className="subtitle text-center mt-2">
-        You're on <b>Step {currentStepIdx + 1}: {steps[currentStepIdx] && ellipses(steps[currentStepIdx].description, 10)}</b>.
-      </p>
-
-      <div className="flex flex-row w-full justify-between gap-2 mt-2">
-        <NavButton currentStepIdx={currentStepIdx} steps={steps} handleStepChange={handleStepChange} direction="prev" />
-        <NavButton currentStepIdx={currentStepIdx} steps={steps} handleStepChange={handleStepChange} direction="next" />
+      <div className="mt-2">
+        <StepFooter
+          currentStepIdx={currentStepIdx}
+          steps={steps}
+          handleStepChange={handleStepChange}
+          handleDesignDocGeneration={handleDesignDocGeneration}
+        />
       </div>
     </>
   );

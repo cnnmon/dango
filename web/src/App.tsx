@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Message,
-  getVscodeConfirmation,
   getDesignDocConfirmation,
   sendMessage,
   userSays,
@@ -34,15 +33,21 @@ function updateDesignDoc(step: Step) {
   return vscode.postMessage({ type: "updateDesignDoc", value: step });
 }
 
+function generateTemplateDesignDoc() {
+  return vscode.postMessage({ type: "generateTemplateDesignDoc" });
+}
+
+/* MAIN APP */
+
 export default function App() {
   /* LOCAL STORAGE */
   const initialStep = parseInt(localStorage.getItem("currentStep") || "0");
 
   /* STATES */
-  const [designDoc, setDesignDoc] = useState<string>("");
+  const [designDoc, setDesignDoc] = useState<string | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [messages, setMessages] = useState<Message[]>([
-      botSays("No design doc found. Make sure design.md is in the root of your workspace, then reload."),
+      botSays("No design doc found. Make sure design.md is present in the root of your workspace, then reload."),
     ]
   );
   const [isDangoLoading, setIsDangoLoading] = useState(false);
@@ -64,15 +69,11 @@ export default function App() {
   const handleDesignDocFound = (designDoc: string) => {
     setDesignDoc(designDoc);
     const foundSteps = parseDesignDocIntoSteps(designDoc);
+    if (!foundSteps.length) {
+      setMessages([botSays("Design doc found, but unable to read steps. Make sure you have a # Steps header with enumerated (1., 2., 3., etc.) steps on new lines.\n\nFor example:\n1. Set up the environment\n2. Write functionality\n3. Write tests.\n\nThen, reload.")]);
+    }
     setSteps(foundSteps);
-    setMessages(getDesignDocConfirmation(foundSteps[initialStep]));
-  }
-
-  const handleDesignDocChange = (newDesignDoc: string) => {
-    setDesignDoc(newDesignDoc);
-    const foundSteps = parseDesignDocIntoSteps(newDesignDoc);
-    setSteps(foundSteps);
-    addMessages([botSays(`The new current step is <b>${foundSteps[currentStepIdx].description}.</b>`)]);
+    setMessages(getDesignDocConfirmation(foundSteps[currentStepIdx]));
   }
 
   const handleStepChange = (newStep: number) => {
@@ -85,6 +86,16 @@ export default function App() {
     if (!textareaValue) return;
     setTextareaValue("");
     const command = textareaValue.toLowerCase().split(" ")[0];
+
+    if (!designDoc) {
+      addMessages([botSays("Unable to proceed without a design doc. Make sure design.md is present in the root of your workspace, then reload.")]);
+      return;
+    }
+
+    if (!steps.length) {
+      addMessages([botSays("Unable to proceed without steps. Make sure your design doc has enumerated (1., 2., 3., etc.) steps on new lines, then reload.")]);
+      return;
+    }
 
     // Special commands that require async handling
     const newMessages = [userSays(textareaValue)];
@@ -116,18 +127,17 @@ export default function App() {
       const message = event.data;
       const { type, value } = message;
       console.log("Received message:", message);
+      // Handle non-chat related chat responses (everything else is handled in sendMessage)
       switch (type) {
         case "readDesignDoc":
           console.log("Received design doc", value);
-          handleDesignDocFound(value);
+          const { success, content } = value;
+          if (!success) return;
+          handleDesignDocFound(content);
           break;
-        case "addFile":
-          console.log("Received add file request", value);
-          addMessages(getVscodeConfirmation(message));
-          break;
-        case "updateDesignDoc":
-          console.log("Received design doc update", value);
-          handleDesignDocChange(value);
+        case "generateTemplateDesignDoc":
+          console.log("Received template design doc request", value);
+          addMessages([botSays("Successfully generated a template design doc at the root of your workspace! Modify it to your needs, then reload.")]);
           break;
       }
     }
@@ -153,6 +163,7 @@ export default function App() {
         setTextareaValue={setTextareaValue}
         handleUserMessage={handleUserMessage}
         handleStepChange={handleStepChange}
+        handleDesignDocGeneration={generateTemplateDesignDoc}
         messagesEndRef={messagesEndRef}
       />
     </div>

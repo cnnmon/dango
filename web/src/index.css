@@ -11,6 +11,10 @@ a {
   text-decoration: underline;
 }
 
+button.subtitle:hover {
+  text-decoration: underline;
+}
+
 .submit-button {
   font-size: 0.75rem !important;
 }

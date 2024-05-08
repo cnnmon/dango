@@ -1,10 +1,6 @@
 import * as vscode from 'vscode';
 
-async function findDesignDoc() {
-  const outputChannel = vscode.window.createOutputChannel("Find Design Doc");
-  outputChannel.clear();
-  outputChannel.show(true);
-
+async function findDesignDoc(outputChannel) {
   // Find the design document
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
@@ -37,8 +33,11 @@ async function readDesignDoc() {
   outputChannel.clear();
   outputChannel.show(true);
 
-  const designDoc = await findDesignDoc();
-  if (!designDoc) return;
+  const designDoc = await findDesignDoc(outputChannel);
+  if (!designDoc) return {
+    success: false,
+    content: '',
+  }
 
   const { content, uri: designDocUri } = designDoc;
   let newContent = content;
@@ -61,11 +60,23 @@ async function readDesignDoc() {
     newContent += '\n\n' + hierarchySection;
   }
 
+  // Check if "# Files" header needs updating
+  if (newContent === content) {
+    outputChannel.appendLine('Design document already contains file hierarchy.');
+    return {
+      success: true,
+      content: newContent,
+    };
+  }
+
   // Write the updated content back to the design document
   const textEncoder = new TextEncoder();
   await vscode.workspace.fs.writeFile(designDocUri, textEncoder.encode(newContent));
   outputChannel.appendLine('Design document updated successfully!');
-  return newContent;
+  return {
+    success: true,
+    content: newContent,
+  };
 }
 
 // Creates a new file in the current working directory
@@ -114,42 +125,52 @@ async function updateDesignDoc(stepToUpdate) {
   outputChannel.clear();
   outputChannel.show(true);
 
-  const designDoc = await findDesignDoc();
+  const designDoc = await findDesignDoc(outputChannel);
   if (!designDoc) return;
 
   const { content, uri: designDocUri } = designDoc;
 
-  // Split the original document into sections
-  const sections = content.split('# Steps');
-  const objective = sections[0];
-  const stepsAndFiles = sections[1].split('# Files');
-  outputChannel.appendLine(`Step: ${JSON.stringify(stepToUpdate)}`);
+  try {
+    // Split the original document into sections
+    const sections = content.split('# Steps');
+    const objective = sections[0];
+    const stepsAndFiles = sections[1].split('# Files');
+    outputChannel.appendLine(`\nStep: ${JSON.stringify(stepToUpdate)}\n`);
 
-  // Process steps
-  const steps = stepsAndFiles[0].split(/\n(?=\d)/); // Split steps by new lines that start with a number
+    // Process steps
+    const steps = stepsAndFiles[0].split(/\n(?=\d)/); // Split steps by new lines that start with a number
+    const updatedSteps = steps.map(step => {
+        const stepNumberMatch = step.match(/^\d+/);
+        outputChannel.appendLine(`Processing step: ${step}`);
+        if (!stepNumberMatch) return step; // Skip if no step number is found (handles empty lines or headers)
+        
+        const stepNumber = parseInt(stepNumberMatch[0], 10);
+        if (stepNumber === stepToUpdate.number) {
+            outputChannel.appendLine(`Found step ${stepNumber} to update in the design document.`);
+            const files = stepToUpdate.files && stepToUpdate.files.length ? `\nFiles:\n${stepToUpdate.files.join('\n')}` : '';
+            return `${stepNumber}. ${stepToUpdate.description}\n${stepToUpdate.information}${files}`;
+        }
+        return step;
+    });
 
-  const updatedSteps = steps.map(step => {
-      const stepNumberMatch = step.match(/^\d+/);
-      if (!stepNumberMatch) return step; // Skip if no step number is found (handles empty lines or headers)
-      
-      const stepNumber = parseInt(stepNumberMatch[0], 10);
-      if (stepNumber === stepToUpdate.number) {
-          // Replace description and information
-          return `${stepNumber}. ${stepToUpdate.description}\n${stepToUpdate.information}\nFiles:\n${stepToUpdate.files.join('\n')}`;
-      }
-      return step;
-  });
+    // Reconstruct the document
+    outputChannel.appendLine(`\nNew steps: ${updatedSteps}\n`);
+    const newStepsSection = updatedSteps.join('\n');
+    outputChannel.appendLine(`\nNew steps: ${newStepsSection}\n`);
+    const filesSection = stepsAndFiles[1];
+    outputChannel.appendLine(`Files: ${filesSection}\n`);
+    const newContent = `${objective}# Steps${newStepsSection}# Files${filesSection}`;
+    outputChannel.appendLine(`\nNew content: ${newContent}\n`);
 
-  // Reconstruct the document
-  const newStepsSection = updatedSteps.join('\n');
-  const filesSection = stepsAndFiles[1];
-  const newContent = `${objective}# Steps${newStepsSection}# Files${filesSection}`;
-
-  // Write the updated content back to the design document
-  const textEncoder = new TextEncoder();
-  await vscode.workspace.fs.writeFile(designDocUri, textEncoder.encode(newContent));
-  outputChannel.appendLine('Design document updated successfully!');
-  return newContent;
+    // Write the updated content back to the design document
+    const textEncoder = new TextEncoder();
+    await vscode.workspace.fs.writeFile(designDocUri, textEncoder.encode(newContent));
+    outputChannel.appendLine(`Design document updated successfully: ${newContent}`);
+    return newContent;
+  } catch (error) {
+    outputChannel.appendLine(`Error updating design document: ${error}`);
+    return null;
+  }
 }
 
 export { addFile, readDesignDoc, updateDesignDoc };

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { readDesignDoc, addFile, updateDesignDoc } from '../utils';
+import { templateDesignDoc } from '../constants';
 
 export class ChatPanel implements vscode.WebviewViewProvider {
   private readonly disposables: vscode.Disposable[] = [];
@@ -56,6 +57,14 @@ export class ChatPanel implements vscode.WebviewViewProvider {
             this.postMessageToWebview({
               type: "updateDesignDoc",
               value: result
+            });
+          });
+          break;
+        case "generateTemplateDesignDoc":
+          addFile("design.md", templateDesignDoc).then(() => {
+            this.postMessageToWebview({
+              type: "generateTemplateDesignDoc",
+              value: templateDesignDoc
             });
           });
           break;

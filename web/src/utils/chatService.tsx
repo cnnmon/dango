@@ -45,22 +45,12 @@ const errorResponse = "I'm sorry, I ran into an error generating a response. Ple
 
 /* CHAT FUNCTIONS */
 
-export const getVscodeConfirmation = (message: VscodeResponse): Message[] => {
-  const { filename, type } = message;
-  switch (type) {
-    case "addFile":
-      return [
-        botSays(`Generated code for ${filename}. Opened the file in the editor.\n\nSay 'approve' to save this code, or 'reject' to try again.`),
-      ];
-    default:
-      return [botSays("I'm sorry, I couldn't generate code.")];
-  }
+export const getDesignDocConfirmation = (step: Step): Message[] => {
+  const { description } = step;
+  return [
+    botSays(`Hi! I'm Dango and I'm your AI project co-collaborator. Type 'proceed' to work together on the current step:\n\n<b>${description}</b>`),
+  ];
 }
-
-export const getDesignDocConfirmation = (step: Step): Message[] => [
-  botSays("Hi! I'm Dango and I'm a design-informed project co-collaborator."),
-  botSays(`Type 'proceed' to work together on the current step: <b>${step.description}</b>.`),
-]
 
 /* HANDLE USER MESSAGES AND SPECIAL REQUESTS */
 /* Two phases of interaction:
@@ -120,7 +110,7 @@ const handleInitialDetectiveRequest = async (step: Step, designDoc: string) => {
       }
     } else {
       const formattedQuestions = questions.map((q: string) => `- ${q}`).join('\n');
-      const questionMessage =  `Before we move on, it would be helpful to answer the question(s):\n\n${formattedQuestions}\n\nRespond with 'add' followed by your answers to the questions or edit your design doc directly.`
+      const questionMessage =  `Before we move on, it would be helpful to answer the question(s):\n\n${formattedQuestions}\n\nRespond with 'add' followed by your answers to the questions or edit your design doc directly. Or, type 'code' to generate code immediately.`
       return {
         success: true,
         newMessages: [botSays(questionMessage)],
@@ -246,7 +236,7 @@ const handleCodeGenerationRequest = async ({
     await generateFile({ code, filename, type: "addFile" });
     return {
       success: true,
-      newMessages: getVscodeConfirmation({ code, filename, type: "addFile" }),
+      newMessages: [botSays(`Generated code for ${filename} and opened the file in the editor.\n\nSay 'approve' to move on to the next step, or 'reject' to try again (these don't work yet oops).`)]
     }
   } catch (error) {
     console.log("Error parsing code response:", error);
