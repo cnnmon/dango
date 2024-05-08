@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { readDesignDoc, addFile } from '../utils';
+import { readDesignDoc, addFile, updateDesignDoc } from '../utils';
 
 export class ChatPanel implements vscode.WebviewViewProvider {
   private readonly disposables: vscode.Disposable[] = [];
@@ -49,8 +49,18 @@ export class ChatPanel implements vscode.WebviewViewProvider {
               value: message.value
             });
           })
+          break;
+        case "updateDesignDoc":
+          const stepToUpdate = message.value as { code: string };
+          updateDesignDoc(stepToUpdate).then((result) => {
+            this.postMessageToWebview({
+              type: "updateDesignDoc",
+              value: result
+            });
+          });
+          break;
         default:
-          vscode.window.showInformationMessage(`Received message: ${JSON.stringify(message)}`);
+          vscode.window.showInformationMessage(`Received unknown message: ${JSON.stringify(message)}`);
           break;
       }
     });

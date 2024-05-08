@@ -1,28 +1,27 @@
 import React from "react";
-import { Message } from "./utils/chatService";
-import { ellipses } from "./utils/utils";
+import { Message, Step } from "./utils/chatService";
+import { ellipses, parseAndFormatMessageText } from "./utils/utils";
 
 function NavButton({ currentStepIdx, steps, handleStepChange, direction }: {
   currentStepIdx: number,
-  steps: string[],
+  steps: Step[],
   handleStepChange: (newStep: number) => void,
   direction: "prev" | "next",
 }) {
-  if (direction === "prev" && currentStepIdx === 0) {
+  const isPrev = direction === "prev";
+  const stepIdx = currentStepIdx + (isPrev ? -1 : 1);
+  if (stepIdx < 0 || stepIdx >= steps.length) {
     return <div></div>;
   }
 
-  if (direction === "next" && currentStepIdx === steps.length - 1) {
-    return <div></div>;
-  }
-
-  const stepIdx = currentStepIdx + (direction === "prev" ? -1 : 1);
   const step = steps[stepIdx];
+  const { number, description } = step;
+  
   return (
     <button
       className={`subtitle`}
-      onClick={() => handleStepChange(currentStepIdx + (direction === "prev" ? -1 : 1))}>
-      {direction === "prev" && "←"} {`Step ${stepIdx + 1}: ${ellipses(step)}`} {direction === "next" && "→"}
+      onClick={() => handleStepChange(stepIdx)}>
+      {direction === "prev" && "←"} {`Step ${number}: ${ellipses(description)}`} {direction === "next" && "→"}
     </button>
   );
 }
@@ -40,7 +39,7 @@ export default function Chatbox({
 }: {
   messages: Message[],
   currentStepIdx: number,
-  steps: string[],
+  steps: Step[],
   isDangoLoading: boolean,
   textareaValue: string,
   setTextareaValue: React.Dispatch<React.SetStateAction<string>>,
@@ -50,12 +49,13 @@ export default function Chatbox({
 }) {
   return (
     <>
+      {/* allow \n to create new lines in the chatbox */}
       <div className="flex flex-col gap-2 mb-2 h-[70vh] max-h-[70vh] overflow-y-auto">
         {messages.map((message, idx) => (
-          <div key={idx} className={`flex flex-row items-center gap-2 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
+          <div key={idx} className={`flex flex-row whitespace-pre-wrap items-center gap-2 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
             <span className="text-lg">{message.role === "user" ? "🧍" : "🍡"}</span>
             <div className="p-2 rounded-md bg-gray-200 flex-1 text-black">
-              {message.content}
+              {parseAndFormatMessageText(message.content)}
             </div>
           </div>
         ))}
@@ -77,7 +77,7 @@ export default function Chatbox({
       </button>
 
       <p className="subtitle text-center mt-2">
-        You're on <b>Step {currentStepIdx + 1}: {ellipses(steps[currentStepIdx], 10)}</b>.
+        You're on <b>Step {currentStepIdx + 1}: {steps[currentStepIdx] && ellipses(steps[currentStepIdx].description, 10)}</b>.
       </p>
 
       <div className="flex flex-row w-full justify-between gap-2 mt-2">
