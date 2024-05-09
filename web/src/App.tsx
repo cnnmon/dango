@@ -10,6 +10,7 @@ import {
 } from "./utils/chatService";
 import Chatbox from "./Chatbox";
 import { parseDesignDoc } from "./utils/utils";
+//import { read } from "fs";
 
 /* VSCODE FUNCTIONS */
 // @ts-ignore
@@ -46,6 +47,7 @@ export default function App() {
   /* STATES */
   const [designDoc, setDesignDoc] = useState<string | null>(null);
   const [allFiles, setAllFiles] = useState<string[]>([]);
+  const [allFileContents, setAllFileContents] = useState<{ name: string; content: string }[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [messages, setMessages] = useState<Message[]>([
       botSays("No design doc found. Make sure design.md is present in the root of your workspace, then reload."),
@@ -58,6 +60,11 @@ export default function App() {
 
   const addMessages = (newMessages: Message[]) => {
     setMessages([...messages, ...newMessages]);
+  }
+
+  const readAllFiles = async () => {
+    vscode.postMessage({ type: "readAllFiles" });
+    return allFileContents;
   }
 
   useEffect(() => {
@@ -113,6 +120,7 @@ export default function App() {
       /* VSCODE FUNCTIONS */
       generateFile,
       updateDesignDoc,
+      readAllFiles,
     }).then((response) => {
       if (response.success) {
         newMessages.push(...response.newMessages);
@@ -141,6 +149,12 @@ export default function App() {
         case "generateTemplateDesignDoc":
           console.log("Received template design doc request", value);
           addMessages([botSays("Successfully generated a template design doc at the root of your workspace! Modify it to your needs, then reload.")]);
+          break;
+        case "readAllFiles":
+          console.log("Received all files", value);
+          const bruh = designDoc;
+          const { files } = value;
+          setAllFileContents(files);
           break;
       }
     }

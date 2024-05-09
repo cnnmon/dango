@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { readDesignDoc, addFile, updateDesignDoc } from '../utils';
+import { readDesignDoc, addFile, updateDesignDoc, readAllFiles } from '../utils';
 import { templateDesignDoc } from '../constants';
 
 export class ChatPanel implements vscode.WebviewViewProvider {
@@ -66,6 +66,16 @@ export class ChatPanel implements vscode.WebviewViewProvider {
             this.postMessageToWebview({
               type: "generateTemplateDesignDoc",
               value: templateDesignDoc
+            });
+          });
+          break;
+        case "readAllFiles":
+          readAllFiles().then((result) => {
+            this.postMessageToWebview({
+              type: "readAllFiles",
+              value: {
+                files: result
+              }
             });
           });
           break;

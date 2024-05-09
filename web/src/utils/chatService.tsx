@@ -1,3 +1,4 @@
+//import { read } from "fs";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -187,13 +188,14 @@ const handleAddInformationRequest = async ({
   }
 }
 
-const handleCodeGenerationRequest = async ({
+/*export */ const handleCodeGenerationRequest = async ({
   messages,
   step,
   designDoc,
   userMessage,
   generateFile,
   updateDesignDoc,
+  readAllFiles,
 }: {
   messages: Message[],
   step: Step,
@@ -201,10 +203,31 @@ const handleCodeGenerationRequest = async ({
   userMessage: string,
   generateFile: (response: VscodeResponse) => void,
   updateDesignDoc: (stepToUpdate: Step) => void,
+  readAllFiles: () => Promise<{
+    name: string;
+    content: string;
+  }[]>,
 }) => {
+
+  console.log("About to handle code generation request!");
+
+  const files = await readAllFiles();
+
+  console.log("File Contents: ", files);
+
+  let fileNames = "Existing Files:";
+  let fileContents = "";
+  for (const file of files) {
+    fileNames += ` ${file.name},`;
+    fileContents += `File: ${file.name}\n\n${file.content}\n\n`;
+  }
+
+  console.log(fileNames);
+  console.log("File Contents String: ", fileContents);
+
   const codePrompt = `
     You are asked to generate code for ONLY the current step:\n${JSON.stringify(step)}\n\n
-    Try not to generate code for future steps or steps that have already been completed. However, prioritize generating code that is correct and complete for the current step. You should also add information to the design doc on this step about the new file you've generated.\n\n
+    Try not to generate code for future steps or steps that have already been completed. However, prioritize generating code that is correct and complete for the current step. You may need to reference the existing files included below. You should also add information to the design doc on this step about the new file you've generated.\n\n
     
     If you can't generate code for this step, add new information on what the project owner can do instead. Or, you may say you're unsure or unable to generate code.\n\n
 
@@ -259,6 +282,10 @@ const handleCodeGenerationRequest = async ({
       "code": null,\n
       "filename": null\n
     }\n
+
+    Here are the existing files in the codebase that you may need to reference:${fileNames}\n\n
+
+    ${fileContents}\n
   `;
 
   const response = await openai.chat.completions.create({
@@ -297,6 +324,7 @@ const handleCodeGenerationRequest = async ({
     }
 
     await generateFile({ code, filename, type: "addFile" });
+
     return {
       success: true,
       newMessages: [botSays(`Generated code for ${filename} and opened the file in the editor.\n\nSay 'approve' to move on to the next step, or 'reject' to try again (these don't work yet oops).`)]
@@ -319,6 +347,7 @@ export const sendMessage = async ({
   /* VSCODE FUNCTIONS */
   generateFile,
   updateDesignDoc,
+  readAllFiles,
 }: {
   command: string;
   userMessage: string;
@@ -327,12 +356,17 @@ export const sendMessage = async ({
   messages: Message[];
   generateFile: (response: VscodeResponse) => void;
   updateDesignDoc: (stepToUpdate: Step) => void;
+  readAllFiles: () => Promise<{
+    name: string;
+    content: string;
+  }[]>
 }): Promise<{
   success: boolean;
   newMessages: Message[];
 }> => {
   switch (command) {
     case "proceed":
+      readAllFiles();
       return handleInitialDetectiveRequest(step, designDoc);
     case "add":
       return handleAddInformationRequest({
@@ -350,6 +384,7 @@ export const sendMessage = async ({
         userMessage,
         generateFile,
         updateDesignDoc,
+        readAllFiles,
       });
   }
   

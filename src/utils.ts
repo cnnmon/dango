@@ -201,4 +201,32 @@ async function updateDesignDoc(updatedStep: { number: number, description: strin
   }
 }
 
-export { addFile, readDesignDoc, updateDesignDoc };
+//Return a list of names and contents of all files in the workspace
+async function readAllFiles() {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders) {
+    vscode.window.showErrorMessage("No workspace folder open.");
+    return;
+  }
+
+  const workspacePath = workspaceFolders[0].uri.fsPath; // Get the first workspace folder
+  const files = await vscode.workspace.fs.readDirectory(vscode.Uri.file(workspacePath));
+
+  //Create list fileContents that iterates over files and creates an object for each containing name and content
+  let fileContents = [];
+  for (const [name] of files) {
+    //Exclude hidden files
+    if (name.startsWith(".")) continue;
+    
+    const fileUri = vscode.Uri.file(`${workspacePath}/${name}`);
+    const fileContentBuffer = await vscode.workspace.fs.readFile(fileUri);
+    const fileContent = new TextDecoder().decode(fileContentBuffer); // Convert buffer to string
+    fileContents.push({ name, content: fileContent });
+  }
+
+  return fileContents;
+}
+
+
+
+export { addFile, readDesignDoc, updateDesignDoc, readAllFiles};
