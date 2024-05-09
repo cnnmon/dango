@@ -80,9 +80,17 @@ export default function App() {
     if (!foundSteps.length) {
       setMessages([botSays("Design doc found, but unable to read steps. (add to this oops)")]);
     }
+
+    //Reset step index if it exceeds the number of steps
+    let stepIdx = currentStepIdx;
+    if (currentStepIdx >= foundSteps.length) {
+      stepIdx = 0;
+      setCurrentStepIdx(stepIdx);
+    }
+
     setSteps(foundSteps);
     setAllFiles(files);
-    setMessages(getDesignDocConfirmation(foundSteps[currentStepIdx]));
+    setMessages(getDesignDocConfirmation(foundSteps[stepIdx]));
   }
 
   const handleStepChange = (newStep: number) => {
