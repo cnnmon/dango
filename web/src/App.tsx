@@ -9,7 +9,7 @@ import {
   Step,
 } from "./utils/chatService";
 import Chatbox from "./Chatbox";
-import { parseDesignDocIntoSteps } from "./utils/utils";
+import { parseDesignDoc } from "./utils/utils";
 
 /* VSCODE FUNCTIONS */
 // @ts-ignore
@@ -45,6 +45,7 @@ export default function App() {
 
   /* STATES */
   const [designDoc, setDesignDoc] = useState<string | null>(null);
+  const [allFiles, setAllFiles] = useState<string[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [messages, setMessages] = useState<Message[]>([
       botSays("No design doc found. Make sure design.md is present in the root of your workspace, then reload."),
@@ -68,11 +69,13 @@ export default function App() {
 
   const handleDesignDocFound = (designDoc: string) => {
     setDesignDoc(designDoc);
-    const foundSteps = parseDesignDocIntoSteps(designDoc);
+    const { steps: foundSteps, files } = parseDesignDoc(designDoc);
+    console.log("Found steps:", foundSteps, "Files:", files);
     if (!foundSteps.length) {
-      setMessages([botSays("Design doc found, but unable to read steps. Make sure you have a # Steps header with enumerated (1., 2., 3., etc.) steps on new lines.\n\nFor example:\n1. Set up the environment\n2. Write functionality\n3. Write tests.\n\nThen, reload.")]);
+      setMessages([botSays("Design doc found, but unable to read steps. (add to this oops)")]);
     }
     setSteps(foundSteps);
+    setAllFiles(files);
     setMessages(getDesignDocConfirmation(foundSteps[currentStepIdx]));
   }
 

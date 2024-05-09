@@ -11,6 +11,10 @@ a {
   text-decoration: underline;
 }
 
+textarea {
+  background-color: white;
+}
+
 button.subtitle:hover {
   text-decoration: underline;
 }

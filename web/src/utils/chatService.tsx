@@ -11,7 +11,6 @@ const openai = new OpenAI({
 export type Step = {
   number: number;
   description: string;
-  files: string[] | null;
   information: string;
 }
 
@@ -58,19 +57,18 @@ export const getDesignDocConfirmation = (step: Step): Message[] => {
     2. PROGRAMMER: Dango generates code
 */
 
-const getInitialPrompt = (designDoc: string, { description, files, information }: Step) => `
+const getInitialPrompt = (designDoc: string, { description, information }: Step) => `
   You are a pair programmer whose job is to generate code given a 'living design document', which you will update as you receive information by chatting with the project's owner.\n\n
 
   It is important to follow the current state of the 'living design doc':\n${designDoc}\n\n
 
   You are currently on step ${description}.\n
-  ${files && `The relevant files for this step are:\n${files.join('\n')}\n`}
   ${information && `Additional information:\n${information}`}\n
 
   Your interface allows for the following commands:\n
   - 'proceed' to move forward with generating code\n
   - 'add' to add information to the design doc\n
-  - 'code' to generate code\n
+  - 'code' to generate code or recommendations\n
   These commands should be automatically detected and handled. If the user deviates from these commands, you can remind them of the available commands.\n\n
 `;
 
@@ -106,11 +104,11 @@ const handleInitialDetectiveRequest = async (step: Step, designDoc: string) => {
     if (ready) {
       return {
         success: true,
-        newMessages: [botSays("Seems like I have no further questions about this step! Type 'code' to generate code.")],
+        newMessages: [botSays("Seems like I have no further questions about this step! Type 'code' to generate code or recommendations.")],
       }
     } else {
       const formattedQuestions = questions.map((q: string) => `- ${q}`).join('\n');
-      const questionMessage =  `Before we move on, it would be helpful to answer the question(s):\n\n${formattedQuestions}\n\nRespond with 'add' followed by your answers to the questions or edit your design doc directly. Or, type 'code' to generate code immediately.`
+      const questionMessage =  `Before we move on, it would be helpful to answer the question(s):\n\n${formattedQuestions}\n\nYou can:\n- Respond with 'add' followed by your answers and I'll add it to your design doc.\nEdit your design doc directly with more information.\nType 'code' to generate code or recommendations immediately.`
       return {
         success: true,
         newMessages: [botSays(questionMessage)],
@@ -195,27 +193,71 @@ const handleCodeGenerationRequest = async ({
   designDoc,
   userMessage,
   generateFile,
+  updateDesignDoc,
 }: {
   messages: Message[],
   step: Step,
   designDoc: string,
   userMessage: string,
   generateFile: (response: VscodeResponse) => void,
+  updateDesignDoc: (stepToUpdate: Step) => void,
 }) => {
   const codePrompt = `
     You are asked to generate code for ONLY the current step:\n${JSON.stringify(step)}\n\n
-    Try not to generate code for future steps or steps that have already been completed. However, prioritize generating code that is correct and complete for the current step.\n\n
+    Try not to generate code for future steps or steps that have already been completed. However, prioritize generating code that is correct and complete for the current step. You should also add information to the design doc on this step about the new file you've generated.\n\n
+    
+    If you can't generate code for this step, add new information on what the project owner can do instead. Or, you may say you're unsure or unable to generate code.\n\n
 
-    Generate code for the current step based on the design doc. You may ONLY respond in the following JSON format:\n
+    You may ONLY respond in the following JSON format:\n
     {\n
-      "code": string of the code to generate,\n
-      "filename": string of the filename to save the code as\n
+      "success": boolean where true means you successfully generated code or provided information on what to do instead,\n
+      "step": {\n
+        "number": number as the step number (keep this the same),\n
+        "description": string describing the step at a high level,\n
+        "files": list of strings or null of relevant file paths,\n
+        "information": string\n
+      } as the updated step object with any new information,\n
+      "code": string of the code to generate or null if no code is generated,\n
+      "filename": string of the filename to save the code as or null if no code is generated,\n
     }\n\n
 
     An example response is:\n
     {\n
+      "success": true,\n
+      "step": {\n
+        "number": 1,\n
+        "description": "Write a program that prints 'Hello, world!'",\n
+        "files": [],\n
+        "information": "Run 'python hello.py' in terminal."\n // New information
+      },\n
       "code": "print('Hello, world!')",\n
       "filename": "hello.py"\n
+    }\n
+
+    Or, if you can't generate code:\n
+    {\n
+      "success": false,\n
+      "step": {\n
+        "number": 1,\n
+        "description": "Create a new Next.js and Tailwind project.",\n
+        "files": [],\n
+        "information": "Run setup.sh in terminal to create the project. Look up Tailwind documentation for more information."\n // New information
+      },\n
+      "code": "npx create-next-app@latest my-project --typescript --eslint",\n
+      "filename": "setup.sh"\n
+    }\n
+    
+    Or:
+    {\n
+      "success": false,\n
+      "step": {\n
+        "number": 1,\n
+        "description": "Create sound files for each key.",\n
+        "files": [],\n
+        "information": "Cannot generate. Recommend using the Tone.js library to generate them."\n // New information
+      },\n
+      "code": null,\n
+      "filename": null\n
     }\n
   `;
 
@@ -232,7 +274,28 @@ const handleCodeGenerationRequest = async ({
 
   try {
     const message = response.choices[0]?.message.content;
-    const { code, filename } = JSON.parse(message as string);
+    const { success, step: newStep, code, filename } = JSON.parse(message as string);
+
+    if (!success) {
+      await updateDesignDoc(newStep); // Send it off to vscode to update!
+      return {
+        success: true,
+        newMessages: [botSays(`I'm unable to generate code for this step, but I've added information to the design doc on what the project owner should do instead.\n\nSay 'approve' to move on to the next step, or 'reject' to try again (these don't work yet oops).`)],
+      }
+    }
+
+    if (!code || !filename) {
+      return {
+        success: false,
+        newMessages: [botSays(errorResponse)],
+      }
+    }
+
+    // If the description of the step has changed as well as the code
+    if (step.information !== newStep.information || step.description !== newStep.description) {
+      await updateDesignDoc(newStep); // Send it off to vscode to update!
+    }
+
     await generateFile({ code, filename, type: "addFile" });
     return {
       success: true,
@@ -286,6 +349,7 @@ export const sendMessage = async ({
         designDoc,
         userMessage,
         generateFile,
+        updateDesignDoc,
       });
   }
   

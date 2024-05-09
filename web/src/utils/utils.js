@@ -23,32 +23,50 @@ export function parseAndFormatMessageText(inputText) {
   return parts;
 }
 
-export function parseDesignDocIntoSteps(docText) {
-  const stepRegex = /(\d+)\.\s(.*?)(?=(\d+\.\s|$))/gs;
-  const fileRegex = /file:\/\/\/[^ \n]+/g;
-  const extraInfoRegex = /(This is.*?)(Files:|$)/s;
+export function parseDesignDoc(inputText) {
+  const stepHeaderPattern = /^##\s+(.*)$/;
+  const sectionPattern = /^# (.*)$/;
 
-  const steps = [];
-  let match;
+  let steps = [];
+  let filePaths = [];
 
-  while ((match = stepRegex.exec(docText)) !== null) {
-      const stepNumber = parseInt(match[1], 10);
-      const stepContent = match[2].trim();
-      
-      let files = stepContent.match(fileRegex);
-      const infoMatch = extraInfoRegex.exec(stepContent);
-      const information = infoMatch ? infoMatch[1].trim() : "";
+  let lines = inputText.split('\n');
+  let currentStep = null;
+  let stepNumber = 0;
+  let currentSection = '';
 
-      const descriptionEndIndex = stepContent.indexOf('Files:') >= 0 ? stepContent.indexOf('Files:') : stepContent.length;
-      const description = stepContent.substring(0, descriptionEndIndex).split('\n')[0].trim();
+  lines.forEach(line => {
+    const sectionMatch = line.match(sectionPattern);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1];
+      return; 
+    }
 
-      steps.push({
-        number: stepNumber,
-        description: description,
-        files: files,
-        information: information
-      });
+    if (currentSection === 'Steps') {
+      if (stepHeaderPattern.test(line)) {
+        if (currentStep) {
+          steps.push(currentStep);
+        }
+        stepNumber++;
+        currentStep = {
+          number: stepNumber,
+          description: line.replace(stepHeaderPattern, '$1'),
+          information: '',
+        };
+      } else if (currentStep) {
+        currentStep.information += line.trim() + ' ';
+      }
+    } else if (currentSection === 'Files') {
+      filePaths.push(line);
+    }
+  });
+
+  if (currentStep) {
+    steps.push(currentStep);
   }
 
-  return steps;
+  return {
+    steps,
+    files: filePaths,
+  };
 }

@@ -31,7 +31,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
 
     this.onDidReceiveMessage((message: {
       type: string;
-      value?: string | number | { code: string, filename: string };
+      value?: string | number | { code: string, filename: string } | { number: number, description: string, information: string };
     }) => {
       switch (message.type) {
         case "readDesignDoc":
@@ -52,7 +52,8 @@ export class ChatPanel implements vscode.WebviewViewProvider {
           })
           break;
         case "updateDesignDoc":
-          const stepToUpdate = message.value as { code: string };
+          const stepToUpdate = message.value as { number: number, description: string, information: string };
+          vscode.window.showInformationMessage(`Updating step ${JSON.stringify(message.value)}`);
           updateDesignDoc(stepToUpdate).then((result) => {
             this.postMessageToWebview({
               type: "updateDesignDoc",

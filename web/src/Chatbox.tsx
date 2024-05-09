@@ -40,10 +40,17 @@ function StepFooter({ currentStepIdx, steps, handleStepChange, handleDesignDocGe
     )
   }
 
+  const currentStep = steps[currentStepIdx];
+  if (!currentStep) {
+    return <div></div>;
+  }
+
+  const { number, description } = currentStep;
+
   return (
     <>
       <p className="subtitle text-center">
-        You're on <b>Step {currentStepIdx + 1}: {steps[currentStepIdx] && ellipses(steps[currentStepIdx].description, 10)}</b>.
+        You're on <b>Step {number}: {currentStep && ellipses(description, 10)}</b>.
       </p>
 
       <div className="flex flex-row w-full justify-between gap-2 mt-2">

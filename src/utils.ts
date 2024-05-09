@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-async function findDesignDoc(outputChannel) {
+async function findDesignDoc(outputChannel: vscode.OutputChannel) {
   // Find the design document
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
@@ -10,7 +10,10 @@ async function findDesignDoc(outputChannel) {
   const workspacePath = workspaceFolders[0].uri.fsPath;
   const designDocPath = `${workspacePath}/design.md`;
   const designDocUri = vscode.Uri.file(designDocPath);
-  const designDocExists = await vscode.workspace.fs.stat(designDocUri).then(() => true, () => false);
+  const designDocExists = await vscode.workspace.fs.stat(designDocUri).then(
+    () => true,
+    () => false
+  );
 
   // Design document not found
   if (!designDocExists) {
@@ -29,30 +32,41 @@ async function findDesignDoc(outputChannel) {
 // Find the design document in the current root workspace
 // Automatically update the files section with the current file hierarchy
 async function readDesignDoc() {
-  const outputChannel = vscode.window.createOutputChannel("Read Design Doc");
+  const outputChannel = vscode.window.createOutputChannel('Read Design Doc');
   outputChannel.clear();
   outputChannel.show(true);
 
   const designDoc = await findDesignDoc(outputChannel);
-  if (!designDoc) return {
-    success: false,
-    content: '',
-  }
+  if (!designDoc)
+    return {
+      success: false,
+      content: '',
+    };
 
   const { content, uri: designDocUri } = designDoc;
   let newContent = content;
 
   // Get file hierarchy
-  const hierarchy = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 500);
-  const hierarchyText = hierarchy.sort((a, b) => a.path.localeCompare(b.path)).join('\n');
+  const hierarchy = await vscode.workspace.findFiles(
+    '**/*',
+    '**/node_modules/**',
+    500
+  );
+  const hierarchyText = hierarchy
+    .sort((a, b) => a.path.localeCompare(b.path))
+    .join('\n');
   const hierarchySection = `# Files\n${hierarchyText}`;
-  
+
   // Check if "# Files" header exists
   const filesHeaderIndex = content.indexOf('# Files');
   if (filesHeaderIndex !== -1) {
     const endOfSectionIndex = content.indexOf('\n#', filesHeaderIndex + 1);
     if (endOfSectionIndex !== -1) {
-      newContent = content.substring(0, filesHeaderIndex) + hierarchySection + '\n' + content.substring(endOfSectionIndex);
+      newContent =
+        content.substring(0, filesHeaderIndex) +
+        hierarchySection +
+        '\n' +
+        content.substring(endOfSectionIndex);
     } else {
       newContent = content.substring(0, filesHeaderIndex) + hierarchySection;
     }
@@ -62,7 +76,9 @@ async function readDesignDoc() {
 
   // Check if "# Files" header needs updating
   if (newContent === content) {
-    outputChannel.appendLine('Design document already contains file hierarchy.');
+    outputChannel.appendLine(
+      'Design document already contains file hierarchy.'
+    );
     return {
       success: true,
       content: newContent,
@@ -71,7 +87,10 @@ async function readDesignDoc() {
 
   // Write the updated content back to the design document
   const textEncoder = new TextEncoder();
-  await vscode.workspace.fs.writeFile(designDocUri, textEncoder.encode(newContent));
+  await vscode.workspace.fs.writeFile(
+    designDocUri,
+    textEncoder.encode(newContent)
+  );
   outputChannel.appendLine('Design document updated successfully!');
   return {
     success: true,
@@ -80,9 +99,9 @@ async function readDesignDoc() {
 }
 
 // Creates a new file in the current working directory
-async function addFile(fileName, rawContent) {
-  const outputChannel = vscode.window.createOutputChannel("Add File");
-  outputChannel.clear(); 
+async function addFile(fileName: string, rawContent: string) {
+  const outputChannel = vscode.window.createOutputChannel('Add File');
+  outputChannel.clear();
   outputChannel.show(true);
 
   try {
@@ -95,9 +114,12 @@ async function addFile(fileName, rawContent) {
     const workspacePath = workspaceFolders[0].uri.fsPath; // Get the first workspace folder
     const filePath = `${workspacePath}/${fileName}`;
     const fileUri = vscode.Uri.file(filePath);
-    
+
     // Replace the file if it already exists
-    const fileExists = await vscode.workspace.fs.stat(fileUri).then(() => true, () => false);
+    const fileExists = await vscode.workspace.fs.stat(fileUri).then(
+      () => true,
+      () => false
+    );
     if (fileExists) {
       await vscode.workspace.fs.delete(fileUri);
     }
@@ -120,52 +142,58 @@ async function addFile(fileName, rawContent) {
 }
 
 // With a new step object, update the design document
-async function updateDesignDoc(stepToUpdate) {
-  const outputChannel = vscode.window.createOutputChannel("Update Design Doc");
+async function updateDesignDoc(updatedStep: { number: number, description: string, information: string }) {
+  const outputChannel = vscode.window.createOutputChannel('Update Design Doc');
   outputChannel.clear();
   outputChannel.show(true);
 
   const designDoc = await findDesignDoc(outputChannel);
-  if (!designDoc) return;
+  if (!designDoc) {
+    outputChannel.appendLine('No design document found.');
+    return;
+  }
 
   const { content, uri: designDocUri } = designDoc;
 
   try {
-    // Split the original document into sections
-    const sections = content.split('# Steps');
-    const objective = sections[0];
-    const stepsAndFiles = sections[1].split('# Files');
-    outputChannel.appendLine(`\nStep: ${JSON.stringify(stepToUpdate)}\n`);
-
-    // Process steps
-    const steps = stepsAndFiles[0].split(/\n(?=\d)/); // Split steps by new lines that start with a number
-    const updatedSteps = steps.map(step => {
-        const stepNumberMatch = step.match(/^\d+/);
-        outputChannel.appendLine(`Processing step: ${step}`);
-        if (!stepNumberMatch) return step; // Skip if no step number is found (handles empty lines or headers)
-        
-        const stepNumber = parseInt(stepNumberMatch[0], 10);
-        if (stepNumber === stepToUpdate.number) {
-            outputChannel.appendLine(`Found step ${stepNumber} to update in the design document.`);
-            const files = stepToUpdate.files && stepToUpdate.files.length ? `\nFiles:\n${stepToUpdate.files.join('\n')}` : '';
-            return `${stepNumber}. ${stepToUpdate.description}\n${stepToUpdate.information}${files}`;
+    const sections = content.split('\n').map(section => section.trim());
+    let updatedText = [];
+    let inStepsSection = false;
+    let currentStepNumber = 0;
+    let finishedInformation = false;
+  
+    sections.forEach(section => {
+      if (inStepsSection) {
+        if (section.startsWith('##')) { // is description
+          currentStepNumber += 1;
+          if (currentStepNumber === updatedStep.number) {
+            updatedText.push(`## ${updatedStep.description}`);
+            return;
+          }
+        } else { // is information
+          if (currentStepNumber === updatedStep.number && !finishedInformation) {
+            finishedInformation = true;
+            updatedText.push(updatedStep.information + '\n');
+            return;
+          }
         }
-        return step;
+      } else if (section.startsWith('# Steps')) {
+        inStepsSection = true;
+      }
+      updatedText.push(section);
     });
-
-    // Reconstruct the document
-    outputChannel.appendLine(`\nNew steps: ${updatedSteps}\n`);
-    const newStepsSection = updatedSteps.join('\n');
-    outputChannel.appendLine(`\nNew steps: ${newStepsSection}\n`);
-    const filesSection = stepsAndFiles[1];
-    outputChannel.appendLine(`Files: ${filesSection}\n`);
-    const newContent = `${objective}# Steps${newStepsSection}# Files${filesSection}`;
-    outputChannel.appendLine(`\nNew content: ${newContent}\n`);
+    
+    const newContent = updatedText.join('\n');
+    outputChannel.appendLine(`\nNew content preview:\n${newContent}\n`);
 
     // Write the updated content back to the design document
     const textEncoder = new TextEncoder();
-    await vscode.workspace.fs.writeFile(designDocUri, textEncoder.encode(newContent));
-    outputChannel.appendLine(`Design document updated successfully: ${newContent}`);
+    await vscode.workspace.fs.writeFile(
+      designDocUri,
+      textEncoder.encode(newContent)
+    );
+    outputChannel.appendLine('Design document updated successfully.');
+
     return newContent;
   } catch (error) {
     outputChannel.appendLine(`Error updating design document: ${error}`);
