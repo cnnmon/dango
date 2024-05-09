@@ -10,7 +10,6 @@ import {
 } from "./utils/chatService";
 import Chatbox from "./Chatbox";
 import { parseDesignDoc } from "./utils/utils";
-//import { read } from "fs";
 
 /* VSCODE FUNCTIONS */
 // @ts-ignore

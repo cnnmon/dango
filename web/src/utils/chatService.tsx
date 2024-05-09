@@ -1,4 +1,3 @@
-//import { read } from "fs";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -188,7 +187,7 @@ const handleAddInformationRequest = async ({
   }
 }
 
-/*export */ const handleCodeGenerationRequest = async ({
+const handleCodeGenerationRequest = async ({
   messages,
   step,
   designDoc,
