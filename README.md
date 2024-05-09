@@ -1,17 +1,9 @@
 # dango 🍡
 
-**dango** is a vscode extension meant to act as an intelligent co-collaborator on your creative programming projects. we can ofc change the name but i thought it'd be a cute filler name for the time being.
+**dango** is a vscode extension meant to act as an intelligent co-collaborator on your creative programming projects.
 
 ## getting started
 see: [the entire "getting started" section](https://code.visualstudio.com/api/get-started/your-first-extension) from the vscode extension api docs
-
-learn what commands are, activation, deactivation.
-
-### the language is typescript
-
-i chose to build it in **typescript**, which is a strongly typed version of javascript. this means we must include explicit types on any parameters passed into to functions.
-
-for example, javascript might say `function myFunction(catName)` and typescript `function myFunction(catName: string)`. then, any usage of `myFunction` with a `catName` that isn't a string will error. this is to ensure our repo stays readable!
 
 ### important files
 
