@@ -1,6 +1,4 @@
-export const PLANNING_PHRASE = 'PLAN';
 export const EXECUTE_PHRASE = 'GO';
-export const ADD_TO_DESIGN_PHRASE = 'ADD';
 
 export function ellipses(text, maxChars = 5) {
   if (!text) return text;

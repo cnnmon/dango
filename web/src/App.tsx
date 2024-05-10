@@ -5,7 +5,6 @@ import {
   sendMessage,
   userSays,
   botSays,
-  VscodeResponse,
   Step,
 } from "./utils/chatService";
 import Chatbox from "./Chatbox";
@@ -19,35 +18,26 @@ function readDesignDoc() {
   return vscode.postMessage({ type: 'readDesignDoc' });
 }
 
-function generateFile(response: VscodeResponse) {
-  const { code, filename } = response;
-  return vscode.postMessage({ type: "addFile", value: {
-    code,
-    filename
-  }});
-}
-
-function updateDesignDoc(step: Step) {
-  return vscode.postMessage({ type: "updateDesignDoc", value: step });
-}
-
 function generateTemplateDesignDoc() {
   return vscode.postMessage({ type: "generateTemplateDesignDoc" });
 }
 
-async function generateStepsAndUpdateDesignDoc() {
-  vscode.postMessage({ type: "generateStepsFromDesignDoc" });
+function generateStepsAndUpdateDesignDoc() {
+  return vscode.postMessage({ type: "generateStepsFromDesignDoc" });
+}
+
+function generate(step: Step) {
+  return vscode.postMessage({ type: "generate", value: step });
 }
 
 /* MAIN APP */
 
 function getSavedMessages(steps: Step[]) {
   const savedStepIdx = localStorage.getItem("savedStepIdx");
-  const savedStepMessages = localStorage.getItem("savedStepMessages");
   const savedStepDescription = localStorage.getItem("savedStepDescription");
 
   // Check if saved messages are invalid -- start of the app probably
-  if (!savedStepIdx || !savedStepMessages || !savedStepDescription) {
+  if (!savedStepIdx  || !savedStepDescription) {
     return {
       stepIdx: 0,
       messages: null
@@ -86,7 +76,7 @@ function getSavedMessages(steps: Step[]) {
 
   return {
     stepIdx: parseInt(savedStepIdx || "-1"),
-    messages: JSON.parse(savedStepMessages || JSON.stringify(null))
+    messages: null,
   }
 }
 
@@ -105,7 +95,6 @@ function saveMessages(stepIdx: number, description: string, messages: Message[])
 export default function App() {
   /* STATES */
   const [designDoc, setDesignDoc] = useState<string | null>(null);
-  const [allFileContents, setAllFileContents] = useState<{ name: string; content: string }[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [currentStepIdx, setCurrentStepIdx] = useState(-1);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -115,11 +104,6 @@ export default function App() {
 
   const addMessages = (newMessages: Message[]) => {
     setMessages([...messages, ...newMessages]);
-  }
-
-  const readAllFiles = async () => {
-    vscode.postMessage({ type: "readAllFiles" });
-    return allFileContents;
   }
 
   useEffect(() => {
@@ -193,10 +177,7 @@ export default function App() {
       steps,
       designDoc,
       messages,
-      /* VSCODE FUNCTIONS */
-      generateFile,
-      updateDesignDoc,
-      readAllFiles,
+      generate, /* VSCODE FUNCTION */
     }).then((response) => {
       if (response.success) {
         newMessages.push(...response.newMessages);
@@ -228,18 +209,6 @@ export default function App() {
       console.log("Received message:", message);
 
       switch (type) {
-        case "addFile":
-          addMessages([botSays(`Generated ${value.filename}. (Approve? Reject?)`)]);
-          setIsDangoLoading(false);
-          break;
-        case "updateDesignDoc":
-          if (value) {
-            addMessages([botSays(`Design doc successfully updated.`)]);
-          } else {
-            addMessages([botSays(`Failed to update design doc. Please try again.`)]);
-          }
-          setIsDangoLoading(false);
-          break;
         case "readDesignDoc":
           if (value.success) {
             handleDesignDocFound(value.content);
@@ -247,10 +216,6 @@ export default function App() {
             setMessages([botSays(`No design doc found. Type <b>${EXECUTE_PHRASE}</b> to generate a starter template. Or, create design.md in the root of your workspace.`)]);
           }
           setIsDangoLoading(false);
-          break;
-        case "readAllFiles":
-          const { files } = value;
-          setAllFileContents(files);
           break;
         case "generateTemplateDesignDoc":
           setDesignDoc(value);
@@ -260,6 +225,12 @@ export default function App() {
           if (!value.success) return;
           const steps = value.content;
           setSteps(steps);
+          setIsDangoLoading(false);
+          break;
+        case "generate":
+          console.log("Received generated code", value);
+          if (!value.success) return;
+          addMessages(value.newMessages);
           setIsDangoLoading(false);
           break;
       }

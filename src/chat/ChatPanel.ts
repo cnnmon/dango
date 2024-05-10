@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { readDesignDoc, addFile, updateDesignDoc, readAllFiles, Step, generateSteps } from '../utils';
-import { templateDesignDoc } from '../constants';
+import { readDesignDoc, addFile, updateDesignDoc, Step, generateSteps, generate, templateDesignDoc } from '../utils';
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -64,7 +63,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
           })
           break;
         case "updateDesignDoc":
-          const stepToUpdate = message.value as { number: number, description: string, information: string };
+          const stepToUpdate = message.value as Step;
           vscode.window.showInformationMessage(`Updating step ${JSON.stringify(message.value)}`);
           updateDesignDoc([stepToUpdate]).then((result) => {
             this.postMessageToWebview({
@@ -82,21 +81,20 @@ export class ChatPanel implements vscode.WebviewViewProvider {
           });
           break;
         case "generateStepsFromDesignDoc":
-            generateSteps(openai).then((result) => {
-              this.postMessageToWebview({
-                type: "generateStepsFromDesignDoc",
-                value: result
-              });
+          generateSteps(openai).then((result) => {
+            this.postMessageToWebview({
+              type: "generateStepsFromDesignDoc",
+              value: result
             });
-          case "readAllFiles":
-            readAllFiles().then((result) => {
-              this.postMessageToWebview({
-                type: "readAllFiles",
-                value: {
-                  files: result
-                }
-              });
+          });
+        case "generate":
+          const step = message.value as Step;
+          generate(openai, step).then((result) => {
+            this.postMessageToWebview({
+              type: "generate",
+              value: result
             });
+          });
           break;
         default:
           vscode.window.showInformationMessage(`Received unknown message: ${JSON.stringify(message)}`);

@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { ADD_TO_DESIGN_PHRASE, EXECUTE_PHRASE, PLANNING_PHRASE } from "./utils";
+import { EXECUTE_PHRASE } from "./utils";
 
 const openai = new OpenAI({
   // @ts-ignore
@@ -56,7 +56,7 @@ export const getDesignDocConfirmation = (step: Step): Message[] => {
 }
 
 export const getChatInstructions = (): Message => {
-  const instructions = `Type <b>${PLANNING_PHRASE}</b> to think through the implementation with Dango.\nType <b>${EXECUTE_PHRASE}</b> to generate this step immediately.\nOr, ask any questions you might have.`;
+  const instructions = `Type <b>${EXECUTE_PHRASE}</b> to work together on this step (this may take a minute or two). Or, ask any questions you might have.`;
   return botSays(instructions);
 }
 
@@ -74,285 +74,13 @@ const getInitialPrompt = (designDoc: string, { description, information }: Step)
   You are currently on step ${description}.\n
   ${information && `Additional information:\n${information}`}\n
 
-  If the user asks for help, tell them your interface allows for the following commands:\n
-  Type ${PLANNING_PHRASE} to let Dango plan and ask about the current step\n
-  Type ${ADD_TO_DESIGN_PHRASE} to add information to the design doc\n
-  Type ${EXECUTE_PHRASE} to generate code or recommendations\n
+  If the user asks for help, tell them your interface allows for the following command:\n
+  Type ${EXECUTE_PHRASE} and Dango will read the design doc and either ask questions to clarify the step, generate code, or add implementation recommendations to the design doc.
 
   If the user wants to reset the design doc or step, they can click off the current tab and back to reset the memory of the design doc.\n\n
 
   These commands should be automatically detected and handled. If the user deviates from these commands, you can remind them of the available commands.\n\n
 `;
-
-const handleInitialDetectiveRequest = async (step: Step, designDoc: string) => {
-  const additionalQuestioningPrompt = `
-    By the information provided, do you think you can generate relevant code for this step? Is there any other information you would need to generate correct code? If so, what questions would you like to ask the project's owner to clarify things?\n\n
-
-    You may ONLY respond in the following JSON format:\n
-    {\n
-      "ready": boolean where true means you are ready to generate code with no questions,\n
-      "questions": list of strings where each string is a question you have for the project's owner,\n
-    }\n\n
-
-    An example response is:\n
-    {\n
-      "ready": false,\n
-      "questions": ["What is the expected output of the program?", "What is the language of the program?"],\n
-    }\n
-  `;
-
-  const response = await openai.chat.completions.create({
-    messages: [
-      botSays(getInitialPrompt(designDoc, step)),
-      botSays(additionalQuestioningPrompt),
-    ],
-    model: "gpt-4-turbo",
-    response_format: { type: "json_object" },
-  });
-
-  try {
-    const message = response.choices[0]?.message.content;
-    const { ready, questions } = JSON.parse(message as string);
-    if (ready) {
-      return {
-        success: true,
-        newMessages: [botSays(`Seems like I have no further questions about this step! Type <b>${EXECUTE_PHRASE}</b> to generate code or recommendations.`)],
-      }
-    } else {
-      const formattedQuestions = questions.map((q: string) => `- ${q}`).join('\n');
-      const questionMessage =  `Before we move on, it would be helpful to answer the question(s):\n\n${formattedQuestions}`
-      const instructionMessage = `Type ${ADD_TO_DESIGN_PHRASE} plus your answers to any of these questions, and I'll add it to your design doc for future reference. Or, you can type <b>${EXECUTE_PHRASE}</b> to generate immediately.`;
-
-      return {
-        success: true,
-        newMessages: [
-          botSays(questionMessage),
-          botSays(instructionMessage),
-        ],
-      }
-    }
-  } catch (error) {
-    console.log("Error parsing code response:", error);
-    return {
-      success: false,
-      newMessages: [botSays(errorResponse)],
-    }
-  }
-}
-
-const handleAddInformationRequest = async ({
-  messages,
-  step,
-  designDoc,
-  userMessage,
-  updateDesignDoc,
-}: {
-  messages: Message[],
-  step: Step,
-  designDoc: string,
-  userMessage: string,
-  updateDesignDoc: (stepToUpdate: Step) => void,
-}) => {
-  const additionalInformationPrompt = `
-    The current step looks like the JSON object:\n
-    ${JSON.stringify(step)}\n\n
-
-    The user responded '${ADD_TO_DESIGN_PHRASE}' plus additional information they'd like to add to the design doc relating to this step.\n
-
-    Keep in mind the design doc structure:\n${designDoc}\n\n
-
-    From the user response, return the updated step object with any new information. You may ONLY respond in the following JSON format:\n
-    {\n
-      "number": number as the step number (keep this the same),\n
-      "description": string describing the step at a high level,\n
-      "files": list of strings or null of relevant file paths,\n
-      "information": string 
-    }\n\n
-
-    An example response is:\n
-    {\n
-      "number": 1,\n
-      "description": "Write a program that prints 'Hello, world!'",\n
-      "files": ["hello.py"],\n
-      "information": "The program should be written in JavaScript. And it should use the Note.js library."
-    }\n
-  `;
-
-  const response = await openai.chat.completions.create({
-    messages: [
-      botSays(getInitialPrompt(designDoc, step)),
-      ...messages,
-      userSays(userMessage),
-      botSays(additionalInformationPrompt),
-    ],
-    model: "gpt-4-turbo",
-  });
-
-  if (response.choices[0]?.message.content) {
-    const updatedStep = JSON.parse(response.choices[0].message.content);
-    console.log("Add response:", response.choices[0].message.content);
-    updateDesignDoc(updatedStep); // Send it off to vscode to update!
-    return {
-      success: true,
-      newMessages: [],
-    }
-  }
-
-  return {
-    success: false,
-    newMessages: [botSays(errorResponse)],
-  }
-}
-
-const handleCodeGenerationRequest = async ({
-  messages,
-  step,
-  designDoc,
-  userMessage,
-  generateFile,
-  updateDesignDoc,
-  readAllFiles,
-}: {
-  messages: Message[],
-  step: Step,
-  designDoc: string,
-  userMessage: string,
-  generateFile: (response: VscodeResponse) => void,
-  updateDesignDoc: (stepToUpdate: Step) => void,
-  readAllFiles: () => Promise<{
-    name: string;
-    content: string;
-  }[]>,
-}) => {
-
-  console.log("About to handle code generation request!");
-
-  const files = await readAllFiles();
-
-  console.log("File Contents: ", files);
-
-  let fileNames = "Existing Files:";
-  let fileContents = "";
-  for (const file of files) {
-    fileNames += ` ${file.name},`;
-    fileContents += `File: ${file.name}\n\n${file.content}\n\n`;
-  }
-
-  console.log(fileNames);
-  console.log("File Contents String: ", fileContents);
-
-  const codePrompt = `
-    You are asked to generate code for ONLY the current step:\n${JSON.stringify(step)}\n\n
-    Try not to generate code for future steps or steps that have already been completed. However, prioritize generating code that is correct and complete for the current step. You may need to reference the existing files included below. You should also add information to the design doc on this step about the new file you've generated.\n\n
-    
-    If you can't generate code for this step, add new information on what the project owner can do instead. Or, you may say you're unsure or unable to generate code.\n\n
-
-    You may ONLY respond in the following JSON format:\n
-    {\n
-      "success": boolean where true means you successfully generated code or provided information on what to do instead,\n
-      "step": {\n
-        "number": number as the step number (keep this the same),\n
-        "description": string describing the step at a high level,\n
-        "files": list of strings or null of relevant file paths,\n
-        "information": string\n
-      } as the updated step object with any new information,\n
-      "code": string of the code to generate or null if no code is generated,\n
-      "filename": string of the filename to save the code as or null if no code is generated,\n
-    }\n\n
-
-    An example response is:\n
-    {\n
-      "success": true,\n
-      "step": {\n
-        "number": 1,\n
-        "description": "Write a program that prints 'Hello, world!'",\n
-        "files": [],\n
-        "information": "Run 'python hello.py' in terminal."\n // New information
-      },\n
-      "code": "print('Hello, world!')",\n
-      "filename": "hello.py"\n
-    }\n
-
-    Or, if you can't generate code:\n
-    {\n
-      "success": false,\n
-      "step": {\n
-        "number": 1,\n
-        "description": "Create a new Next.js and Tailwind project.",\n
-        "files": [],\n
-        "information": "Run setup.sh in terminal to create the project. Look up Tailwind documentation for more information."\n // New information
-      },\n
-      "code": "npx create-next-app@latest my-project --typescript --eslint",\n
-      "filename": "setup.sh"\n
-    }\n
-    
-    Or:
-    {\n
-      "success": false,\n
-      "step": {\n
-        "number": 1,\n
-        "description": "Create sound files for each key.",\n
-        "files": [],\n
-        "information": "Cannot generate. Recommend using the Tone.js library to generate them."\n // New information
-      },\n
-      "code": null,\n
-      "filename": null\n
-    }\n
-
-    Here are the existing files in the codebase that you may need to reference:${fileNames}\n\n
-
-    ${fileContents}\n
-  `;
-
-  const response = await openai.chat.completions.create({
-    messages: [
-      botSays(getInitialPrompt(designDoc, step)),
-      ...messages,
-      userSays(userMessage),
-      botSays(codePrompt),
-    ],
-    model: "gpt-4-turbo",
-    response_format: { type: "json_object" },
-  });
-
-  try {
-    const message = response.choices[0]?.message.content;
-    const { success, step: newStep, code, filename } = JSON.parse(message as string);
-
-    if (!success) {
-      updateDesignDoc(newStep);
-      return {
-        success: true,
-        newMessages: [],
-      }
-    }
-
-    if (!code || !filename) {
-      return {
-        success: false,
-        newMessages: [botSays(errorResponse)],
-      }
-    }
-
-    // If the description of the step has changed as well as the code
-    if (step.information !== newStep.information || step.description !== newStep.description) {
-      updateDesignDoc(newStep); // Send it off to vscode to update!
-    }
-
-    generateFile({ code, filename });
-
-    return {
-      success: true,
-      newMessages: []
-    }
-  } catch (error) {
-    console.log("Error parsing code response:", error);
-    return {
-      success: false,
-      newMessages: [botSays(errorResponse)],
-    }
-  }
-}
 
 export const sendMessage = async ({
   command,
@@ -361,10 +89,7 @@ export const sendMessage = async ({
   steps,
   designDoc,
   messages,
-  /* VSCODE FUNCTIONS */
-  generateFile,
-  updateDesignDoc,
-  readAllFiles,
+  generate, /* VSCODE FUNCTIONS */
 }: {
   command: string;
   userMessage: string;
@@ -372,12 +97,7 @@ export const sendMessage = async ({
   steps: Step[];
   designDoc: string | null;
   messages: Message[];
-  generateFile: (response: VscodeResponse) => void;
-  updateDesignDoc: (stepToUpdate: Step) => void;
-  readAllFiles: () => Promise<{
-    name: string;
-    content: string;
-  }[]>
+  generate: (step: Step) => void; /* VSCODE FUNCTIONS */
 }): Promise<{
   success: boolean;
   newMessages: Message[];
@@ -399,28 +119,12 @@ export const sendMessage = async ({
   }
 
   const step = steps[currentStepIdx];
-  switch (command) {
-    case PLANNING_PHRASE:
-      readAllFiles();
-      return handleInitialDetectiveRequest(step, designDoc);
-    case ADD_TO_DESIGN_PHRASE:
-      return handleAddInformationRequest({
-        messages,
-        step,
-        designDoc,
-        userMessage,
-        updateDesignDoc
-      });
-    case EXECUTE_PHRASE:
-      return handleCodeGenerationRequest({
-        messages,
-        step,
-        designDoc,
-        userMessage,
-        generateFile,
-        updateDesignDoc,
-        readAllFiles,
-      });
+  if (command === EXECUTE_PHRASE) {
+    generate(step);
+    return {
+      success: true,
+      newMessages: [],
+    }
   }
 
   // Normal chat catch-all (codebase questions, etc.)

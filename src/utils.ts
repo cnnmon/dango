@@ -1,10 +1,42 @@
 import * as vscode from 'vscode';
+const EXECUTE_PHRASE = "GO";
 
 export type Step = {
   number: number;
   description: string;
   information: string;
 }
+
+export type Message = {
+  role: string;
+  content: string;
+}
+
+export const templateDesignDoc = `# Objective
+Develop a digital piano application with distinct soundboard-type audio for each key.
+
+# Technologies
+Next.js, Tone.js, Tailwind
+
+# Notes
+Modify this design doc however you'd like to fit your project's needs!
+`;
+
+const getInitialPrompt = (designDoc: string, { description, information }: Step) => `
+  You are a pair programmer whose job is to generate code given a 'living design document', which you will update as you receive information by chatting with the project's owner.\n\n
+
+  It is important to follow the current state of the 'living design doc':\n${designDoc}\n\n
+
+  You are currently on step ${description}.\n
+  ${information && `Additional information:\n${information}`}\n
+
+  If the user asks for help, tell them your interface allows for the following command:\n
+  Type ${EXECUTE_PHRASE} and Dango will read the design doc and either ask questions to clarify the step, generate code, or add implementation recommendations to the design doc.
+
+  If the user wants to reset the design doc or step, they can click off the current tab and back to reset the memory of the design doc.\n\n
+
+  These commands should be automatically detected and handled. If the user deviates from these commands, you can remind them of the available commands.\n\n
+`;
 
 async function findDesignDoc(outputChannel: vscode.OutputChannel) {
   // Find the design document
@@ -283,4 +315,172 @@ async function generateSteps(openai: any) {
   }
 }
 
-export { addFile, readDesignDoc, updateDesignDoc, readAllFiles, generateSteps };
+/* Generate code OR add recommendations to design doc OR return a list of questions to ask the user */
+async function generate(openai: any, step: Step) {
+  const { number, description } = step;
+  const outputChannel = vscode.window.createOutputChannel(`Generating step ${number}: ${description}`);
+
+  /* Get design doc */
+  const { content: designDoc } = await readDesignDoc();
+  if (!designDoc) {
+    return {
+      success: false,
+      newMessages: [],
+    }
+  }
+  outputChannel.appendLine(`Design doc: ${designDoc}`);
+
+  /* File stuff */
+  /*
+  const files = await readAllFiles();
+  let fileNames = "Existing Files:";
+  let fileContents = "";
+  for (const file of files) {
+    fileNames += ` ${file.name},`;
+    fileContents += `File: ${file.name}\n\n${file.content}\n\n`;
+  }
+  outputChannel.appendLine(`Existing files: ${fileNames}`);
+  */
+
+  /* Prompt */
+  const codePrompt = `
+    You are asked to generate code for ONLY the current step:\n${JSON.stringify(step)}\n\n
+    Try not to generate code for future steps or steps that have already been completed. Prioritize generating code that is correct and functional for the current step. Use the design doc for context.\n\n
+    
+    Do one of three things:\n
+    - If you can generate code, provide the code in the 'code' field and the filename in 'filename'.\n
+    - If you can't generate because you need more information, append question strings for what the project owner needs to clarify in 'questions'.\n
+    - If you can't generate because it is not a coding task, add information to the design doc in 'information' on what the project owner can do instead.\n\n
+
+    You may ONLY respond in the following JSON format:\n
+    {\n
+      "result": string of "code" or "question" or "information" or null if unsuccessful,\n
+      "information": use the information field from the given step and append new information as needed,\n
+      "code": string of the code to generate or null if no code is generated,\n
+      "filename": string of the filename to save the code as or null if no code is generated,\n
+    }\n\n
+
+    An example response to a step saying "Create a Python file called hello":\n
+    {\n
+      "result": "code",\n
+      "information": null,\n
+      "code": "print('Hello, world!')",\n
+      "filename": "hello.py"\n
+    }\n
+    
+    Or, for a step "Create sound files for each key.":\n
+    {\n
+      "result": "information",\n
+      "step": "Cannot generate. Recommend using the Tone.js library to generate them.",\n
+      "code": null,\n
+      "filename": null\n
+    }\n
+
+    Or, for a step "Create a class called 'Car' with a method 'drive' that prints 'Vroom!'":\n
+    {\n
+      "result": "question",\n
+      "information": null,\n
+      "code": null,\n
+      "filename": null,\n
+      "questions": ["What programming language should the class be written in?"]\n
+    }\n
+  `;
+  /*
+    Here are the existing files in the codebase that you may need to reference:${fileNames}\n\n
+    ${fileContents}\n
+  */
+
+  const response = await openai.chat.completions.create({
+    messages: [
+      {
+        role: "system",
+        content: getInitialPrompt(designDoc, step),
+      },
+      {
+        role: "system",
+        content: codePrompt,
+      },
+    ],
+    model: "gpt-4-turbo",
+    response_format: { type: "json_object" },
+  });
+
+  outputChannel.appendLine(`Code response: ${JSON.stringify(response)}`);
+
+  try {
+    const message = response.choices[0]?.message.content;
+    const {
+      result,
+      information,
+      code,
+      filename,
+      questions,
+    } = JSON.parse(message as string);
+
+    if (!result) {
+      return {
+        success: false,
+        newMessages: [],
+      }
+    }
+
+    /* QUESTION: If the response is a question, return the questions to ask the user */
+    if (result === "question") {
+      return {
+        success: true,
+        newMessages: [
+          {
+            role: "system",
+            content: `Questions for step ${number}:\n ${questions.join("\n")}. Add these answers to your design doc.`,
+          },
+        ],
+      }
+    }
+
+    /* INFORMATION: If the response is information, update the design doc */
+    if (result === "information") {
+      await updateDesignDoc([{ ...step, information }]);
+      return {
+        success: true,
+        newMessages: [
+          {
+            role: "system",
+            content: `Added information to step ${number}: ${information}`,
+          },
+        ],
+      }
+    }
+
+    /* CODE: If the response is code, add the code to a new file */
+    if (!code || !filename) {
+      return {
+        success: false,
+        newMessages: [
+          {
+            role: "system",
+            content: `Failed to generate code for step ${number}.`,
+          },
+        ],
+      }
+    }
+    await addFile(filename, code);
+
+    return {
+      success: true,
+      newMessages: [
+        {
+          role: "system",
+          content: `Code generated for step ${number} in ${filename}. If you are unhappy with the code, modify the design doc and type <b>${EXECUTE_PHRASE}</b> to try again.`,
+        }
+      ]
+    }
+  } catch (error) {
+    outputChannel.appendLine(`Error parsing code response: ${error}`);
+    return {
+      success: false,
+      newMessages: [],
+    }
+  }
+}
+
+export { addFile, readDesignDoc, updateDesignDoc, generate, generateSteps };
