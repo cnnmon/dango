@@ -7,10 +7,9 @@ import {
   botSays,
   VscodeResponse,
   Step,
-  formatStep,
 } from "./utils/chatService";
 import Chatbox from "./Chatbox";
-import { EXECUTE_PHRASE, PLANNING_PHRASE, parseDesignDoc } from "./utils/utils";
+import { EXECUTE_PHRASE, parseDesignDoc } from "./utils/utils";
 
 /* VSCODE FUNCTIONS */
 // @ts-ignore
@@ -42,7 +41,7 @@ async function generateStepsAndUpdateDesignDoc() {
 
 /* MAIN APP */
 
-function getSavedMessages(steps: Step[], fallbackMessages: Message[]) {
+function getSavedMessages(steps: Step[]) {
   const savedStepIdx = localStorage.getItem("savedStepIdx");
   const savedStepMessages = localStorage.getItem("savedStepMessages");
   const savedStepDescription = localStorage.getItem("savedStepDescription");
@@ -51,17 +50,25 @@ function getSavedMessages(steps: Step[], fallbackMessages: Message[]) {
   if (!savedStepIdx || !savedStepMessages || !savedStepDescription) {
     return {
       stepIdx: 0,
-      messages: fallbackMessages
+      messages: null
     }
   }
 
   // Check if valid step index
   const stepIdx = parseInt(savedStepIdx);
-  if (stepIdx < 0 || stepIdx >= steps.length) {
+  if (stepIdx < 0) {
+    resetSavedMessages();
+    return {
+      stepIdx: -1,
+      messages: null
+    }
+  }
+
+  if (stepIdx >= steps.length) {
     resetSavedMessages();
     return {
       stepIdx: null,
-      messages: fallbackMessages
+      messages: null
     }
   }
 
@@ -69,16 +76,17 @@ function getSavedMessages(steps: Step[], fallbackMessages: Message[]) {
   
   // Check if the step description is the same
   if (existingDescription !== savedStepDescription) {
-    resetSavedMessages();
+    localStorage.removeItem("savedStepDescription");
+    localStorage.removeItem("savedStepMessages");
     return {
-      stepIdx: null,
-      messages: fallbackMessages
+      stepIdx,
+      messages: null
     }
   }
 
   return {
-    stepIdx: parseInt(savedStepIdx || "0"),
-    messages: JSON.parse(savedStepMessages || JSON.stringify(fallbackMessages))
+    stepIdx: parseInt(savedStepIdx || "-1"),
+    messages: JSON.parse(savedStepMessages || JSON.stringify(null))
   }
 }
 
@@ -99,7 +107,7 @@ export default function App() {
   const [designDoc, setDesignDoc] = useState<string | null>(null);
   const [allFileContents, setAllFileContents] = useState<{ name: string; content: string }[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
-  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [currentStepIdx, setCurrentStepIdx] = useState(-1);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isDangoLoading, setIsDangoLoading] = useState(false);
   const [textareaValue, setTextareaValue] = useState<string>("");
@@ -125,35 +133,44 @@ export default function App() {
     setDesignDoc(designDoc);
     const foundSteps = parseDesignDoc(designDoc);
     console.log("Found steps", foundSteps);
-    
+
     if (!foundSteps.length) {
-      setMessages([botSays(`Design doc found, but unable to read steps. Reply with '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
+      setMessages([botSays(`Design doc found, but unable to read steps. Type <b>${EXECUTE_PHRASE}</b> and I'll generate steps for us to work on. (This might take a few minutes.)`)]);
       return;
     }
+
     setSteps(foundSteps);
 
     // Get saved step index and messages
-    const { stepIdx, messages: savedMessages } = getSavedMessages(foundSteps, getDesignDocConfirmation(foundSteps[currentStepIdx]));
-    setCurrentStepIdx(stepIdx || 0);
-    setMessages(savedMessages);
+    const { stepIdx, messages: savedMessages } = getSavedMessages(foundSteps);
+    if (savedMessages && stepIdx !== null && stepIdx > 0) {
+      setCurrentStepIdx(stepIdx || 0);
+      setMessages(savedMessages);
+    }
   }
 
   const handleStepChange = (newStep: number) => {
     setCurrentStepIdx(newStep);
 
-    // Check if we're navigating to the "currentStepIdx"; if so, load messages from local storage
-    const fallbackMessages = getDesignDocConfirmation(steps[newStep]);
-    const { stepIdx, messages } = getSavedMessages(steps, fallbackMessages);
-    if (newStep === stepIdx) {
-      setMessages(messages);
+    // If new step is -1 (landing)
+    if (newStep === -1) {
       return;
     }
 
-    // If there's an existing saved step, notify the user that their conversation will be erased
-    if (stepIdx) {
+    // Check if we're navigating to the "currentStepIdx"; if so, load messages from local storage
+    const fallbackMessages = getDesignDocConfirmation(steps[newStep]);
+    const { stepIdx, messages } = getSavedMessages(steps);
+    if (messages && stepIdx !== null) {
+      // If we're navigating to the same step, just load the messages
+      if (newStep === stepIdx) {
+        setMessages(messages);
+        return;
+      }
+      
+      // Else, if there's an existing saved step, notify the user that their conversation will be erased
       setMessages([
         ...fallbackMessages,
-        botSays(`(NOTE: Sending messages will erase your conversation on Step ${stepIdx})`)
+        botSays(`(NOTE: Chatting will erase your conversation on Step ${stepIdx + 1}.)`)
       ]);
     } else {
       setMessages(fallbackMessages);
@@ -180,8 +197,6 @@ export default function App() {
       generateFile,
       updateDesignDoc,
       readAllFiles,
-      generateTemplateDesignDoc,
-      generateStepsAndUpdateDesignDoc,
     }).then((response) => {
       if (response.success) {
         newMessages.push(...response.newMessages);
@@ -219,7 +234,7 @@ export default function App() {
           break;
         case "updateDesignDoc":
           if (value) {
-            addMessages([botSays(`Design doc successfully updated. Type '${PLANNING_PHRASE}' to plan this step. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)]);
+            addMessages([botSays(`Design doc successfully updated.`)]);
           } else {
             addMessages([botSays(`Failed to update design doc. Please try again.`)]);
           }
@@ -229,7 +244,7 @@ export default function App() {
           if (value.success) {
             handleDesignDocFound(value.content);
           } else {
-            setMessages([botSays(`No design doc found. Reply with '${EXECUTE_PHRASE}' to generate a starter template. Or, create design.md with information on your intended project in the root of your workspace.`)]);
+            setMessages([botSays(`No design doc found. Type <b>${EXECUTE_PHRASE}</b> to generate a starter template. Or, create design.md in the root of your workspace.`)]);
           }
           setIsDangoLoading(false);
           break;
@@ -239,18 +254,12 @@ export default function App() {
           break;
         case "generateTemplateDesignDoc":
           setDesignDoc(value);
-          addMessages([botSays(`Successfully generated a template design doc at the root of your workspace.\n\nWrite about your project then reply '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
           setIsDangoLoading(false);
           break;
         case "generateStepsFromDesignDoc":
           if (!value.success) return;
           const steps = value.content;
           setSteps(steps);
-          addMessages([
-            botSays(`Successfully generated steps from design doc. I recommend you look over & modify the design doc to fit your needs before we get started.`),
-            botSays(`You are currently on ${formatStep(steps[currentStepIdx])}`),
-            botSays(`Type '${PLANNING_PHRASE}' to begin planning the implementation for this current step together. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)
-          ]);
           setIsDangoLoading(false);
           break;
       }
@@ -274,10 +283,13 @@ export default function App() {
         currentStepIdx={currentStepIdx}
         steps={steps}
         isDangoLoading={isDangoLoading}
+        setIsDangoLoading={setIsDangoLoading}
         textareaValue={textareaValue}
         setTextareaValue={setTextareaValue}
         handleUserMessage={handleUserMessage}
         handleStepChange={handleStepChange}
+        handleDesignDocGeneration={generateTemplateDesignDoc}
+        handleStepGeneration={generateStepsAndUpdateDesignDoc}
         messagesEndRef={messagesEndRef}
       />
     </div>

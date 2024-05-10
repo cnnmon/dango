@@ -233,14 +233,14 @@ async function generateSteps(openai: any) {
     {\n
       "steps": list of objects where each object has the following keys:\n
       - "description": short string describing the step at a high level,\n
-      - "information": string of additional information needed for the step that may be helpful for the project owner to know,\n
+      - "information": string of additional information (use this sparingly),\n
     }\n\n
 
     For example, given a design doc that says "Develop a project to convert each word in a string from the command line into 'meow'.", you might respond with:\n
     {\n
       "steps": [\n
         {"description": "Create a Python file named meow.py."},\n
-        {"description": "Write a program that converts each word in a string to 'meow'.", "information": "Use the split() method to separate each word in the string."},\n
+        {"description": "Write a program that converts each word in a string to 'meow'."},\n
       ]\n
     }\n
 

@@ -5,6 +5,7 @@
 body {
   background-color: white;
   font-size: 0.80rem !important;
+  color: black;
 }
 
 a {
@@ -21,6 +22,10 @@ button.subtitle:hover {
 
 .submit-button {
   font-size: 0.75rem !important;
+}
+
+.gray {
+  color: #878787;
 }
 
 .subtitle {
