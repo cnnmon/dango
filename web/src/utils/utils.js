@@ -28,11 +28,10 @@ export function parseAndFormatMessageText(inputText) {
 }
 
 export function parseDesignDoc(inputText) {
-  const stepHeaderPattern = /^##\s+\d+\.\s*(.*)$/;
+  const stepHeaderPattern = /^##\s*(?:\d+\.\s*)?(.*)$/;
   const sectionPattern = /^# (.*)$/;
 
   let steps = [];
-
   let lines = inputText.split('\n');
   let currentStep = null;
   let stepNumber = 0;
@@ -42,18 +41,19 @@ export function parseDesignDoc(inputText) {
     const sectionMatch = line.match(sectionPattern);
     if (sectionMatch) {
       currentSection = sectionMatch[1];
-      return; 
+      return;
     }
 
     if (currentSection === 'Steps') {
-      if (stepHeaderPattern.test(line)) {
+      const stepMatch = line.match(stepHeaderPattern);
+      if (stepMatch) {
         if (currentStep) {
           steps.push(currentStep);
         }
         stepNumber++;
         currentStep = {
           number: stepNumber,
-          description: line.replace(stepHeaderPattern, '$1'),
+          description: stepMatch[1], // Use the first capture group which is the description
           information: '',
         };
       } else if (currentStep) {

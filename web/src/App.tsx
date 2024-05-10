@@ -42,25 +42,56 @@ async function generateStepsAndUpdateDesignDoc() {
 
 /* MAIN APP */
 
-const defaultMessages = [
-  botSays(`Hi! I'm Dango, your project co-collaborator. I work off of your design doc to generate code and improve your workflow. Let's get started!`),
-  botSays(`No design doc found. Reply with '${EXECUTE_PHRASE}' to generate a starter template. Or, create design.md with information on your intended project in the root of your workspace.`),
-]
+function getSavedMessages(steps: Step[], fallbackMessages: Message[]) {
+  const savedStepIdx = localStorage.getItem("savedStepIdx");
+  const savedStepMessages = localStorage.getItem("savedStepMessages");
+  const savedStepDescription = localStorage.getItem("savedStepDescription");
 
-function getSavedMessages(fallbackMessages: Message[]) {
+  // Check if saved messages are invalid -- start of the app probably
+  if (!savedStepIdx || !savedStepMessages || !savedStepDescription) {
+    return {
+      stepIdx: 0,
+      messages: fallbackMessages
+    }
+  }
+
+  // Check if valid step index
+  const stepIdx = parseInt(savedStepIdx);
+  if (stepIdx < 0 || stepIdx >= steps.length) {
+    resetSavedMessages();
+    return {
+      stepIdx: null,
+      messages: fallbackMessages
+    }
+  }
+
+  const { description: existingDescription } = steps[stepIdx];
+  console.log("Existing description", existingDescription, savedStepDescription);
+  
+  // Check if the step description is the same
+  if (existingDescription !== savedStepDescription) {
+    resetSavedMessages();
+    return {
+      stepIdx: null,
+      messages: fallbackMessages
+    }
+  }
+
   return {
-    stepIdx: parseInt(localStorage.getItem("savedStepIdx") || "0"),
-    messages: JSON.parse(localStorage.getItem("savedStepMessages") || JSON.stringify(fallbackMessages))
+    stepIdx: parseInt(savedStepIdx || "0"),
+    messages: JSON.parse(savedStepMessages || JSON.stringify(fallbackMessages))
   }
 }
 
 function resetSavedMessages() {
   localStorage.removeItem("savedStepIdx");
+  localStorage.removeItem("savedStepDescription");
   localStorage.removeItem("savedStepMessages");
 }
 
-function saveMessages(stepIdx: number, messages: Message[]) {
+function saveMessages(stepIdx: number, description: string, messages: Message[]) {
   localStorage.setItem("savedStepIdx", stepIdx.toString());
+  localStorage.setItem("savedStepDescription", description);
   localStorage.setItem("savedStepMessages", JSON.stringify(messages));
 }
 
@@ -94,6 +125,7 @@ export default function App() {
   const handleDesignDocFound = (designDoc: string) => {
     setDesignDoc(designDoc);
     const foundSteps = parseDesignDoc(designDoc);
+    console.log("Found steps", foundSteps);
     if (!foundSteps.length) {
       setMessages([botSays(`Design doc found, but unable to read steps. Reply with '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
       return;
@@ -101,16 +133,8 @@ export default function App() {
     setSteps(foundSteps);
 
     // Get saved step index and messages
-    const { stepIdx, messages: savedMessages } = getSavedMessages(getDesignDocConfirmation(foundSteps[currentStepIdx]));
-
-    // Reset step index if it exceeds the number of steps
-    if (stepIdx >= foundSteps.length) {
-      resetSavedMessages();
-      setCurrentStepIdx(0);
-      setMessages(getDesignDocConfirmation(foundSteps[stepIdx]));
-    }
-
-    setCurrentStepIdx(stepIdx);
+    const { stepIdx, messages: savedMessages } = getSavedMessages(foundSteps, getDesignDocConfirmation(foundSteps[currentStepIdx]));
+    setCurrentStepIdx(stepIdx || 0);
     setMessages(savedMessages);
   }
 
@@ -119,13 +143,21 @@ export default function App() {
 
     // Check if we're navigating to the "currentStepIdx"; if so, load messages from local storage
     const fallbackMessages = getDesignDocConfirmation(steps[newStep]);
-    const { stepIdx, messages } = getSavedMessages(fallbackMessages);
+    const { stepIdx, messages } = getSavedMessages(steps, fallbackMessages);
     if (newStep === stepIdx) {
       setMessages(messages);
       return;
     }
 
-    setMessages(fallbackMessages);
+    // If there's an existing saved step, notify the user that their conversation will be erased
+    if (stepIdx) {
+      setMessages([
+        ...fallbackMessages,
+        botSays(`(NOTE: Sending messages will erase your conversation on Step ${stepIdx})`)
+      ]);
+    } else {
+      setMessages(fallbackMessages);
+    }
   }
 
   const handleUserMessage = async () => {
@@ -167,7 +199,8 @@ export default function App() {
 
       // Only save current step to come back to if you send a message in it
       if (steps) {
-        saveMessages(currentStepIdx, allMessages);
+        const { description } = steps[currentStepIdx];
+        saveMessages(currentStepIdx, description, allMessages);
       }
     });
   }
@@ -192,8 +225,11 @@ export default function App() {
           break;
         case "readDesignDoc":
           console.log("Received design doc", value);
-          if (!value.success) return;
-          handleDesignDocFound(value.content);
+          if (!value.success) {
+            setMessages([botSays(`No design doc found. Reply with '${EXECUTE_PHRASE}' to generate a starter template. Or, create design.md with information on your intended project in the root of your workspace.`)]);
+          } else {
+            handleDesignDocFound(value.content);
+          }
           setIsDangoLoading(false);
           break;
         case "readAllFiles":
