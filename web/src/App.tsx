@@ -84,11 +84,12 @@ export default function App() {
       return;
     }
 
-    //Reset step index if it exceeds the number of steps
+    // Reset step index if it exceeds the number of steps
     let stepIdx = currentStepIdx;
     if (currentStepIdx >= foundSteps.length) {
       stepIdx = 0;
       setCurrentStepIdx(stepIdx);
+      window.localStorage.setItem("currentStep", stepIdx.toString());
     }
 
     setSteps(foundSteps);
