@@ -83,8 +83,16 @@ export default function App() {
       setMessages([botSays(`Design doc found, but unable to read steps. Reply with '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
       return;
     }
+
+    //Reset step index if it exceeds the number of steps
+    let stepIdx = currentStepIdx;
+    if (currentStepIdx >= foundSteps.length) {
+      stepIdx = 0;
+      setCurrentStepIdx(stepIdx);
+    }
+
     setSteps(foundSteps);
-    setMessages(getDesignDocConfirmation(foundSteps[currentStepIdx]));
+    setMessages(getDesignDocConfirmation(foundSteps[stepIdx]));
   }
 
   const handleStepChange = (newStep: number) => {
