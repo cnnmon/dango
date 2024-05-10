@@ -7,18 +7,17 @@ import {
   botSays,
   VscodeResponse,
   Step,
+  formatStep,
 } from "./utils/chatService";
 import Chatbox from "./Chatbox";
-import { parseDesignDoc } from "./utils/utils";
+import { EXECUTE_PHRASE, PLANNING_PHRASE, parseDesignDoc } from "./utils/utils";
 
 /* VSCODE FUNCTIONS */
 // @ts-ignore
 declare const vscode: VSCode;
 
 function readDesignDoc() {
-  return vscode.postMessage({
-    type: 'readDesignDoc',
-  });
+  return vscode.postMessage({ type: 'readDesignDoc' });
 }
 
 function generateFile(response: VscodeResponse) {
@@ -45,23 +44,73 @@ function readRelevantFiles(paths: string[]) {
   return vscode.postMessage({ type: "readRelevantFiles", value: paths });
 }
 
+async function generateStepsAndUpdateDesignDoc() {
+  vscode.postMessage({ type: "generateStepsFromDesignDoc" });
+}
+
 /* MAIN APP */
 
-export default function App() {
-  /* LOCAL STORAGE */
-  const initialStep = parseInt(localStorage.getItem("currentStep") || "0");
+function getSavedMessages(steps: Step[], fallbackMessages: Message[]) {
+  const savedStepIdx = localStorage.getItem("savedStepIdx");
+  const savedStepMessages = localStorage.getItem("savedStepMessages");
+  const savedStepDescription = localStorage.getItem("savedStepDescription");
 
+  // Check if saved messages are invalid -- start of the app probably
+  if (!savedStepIdx || !savedStepMessages || !savedStepDescription) {
+    return {
+      stepIdx: 0,
+      messages: fallbackMessages
+    }
+  }
+
+  // Check if valid step index
+  const stepIdx = parseInt(savedStepIdx);
+  if (stepIdx < 0 || stepIdx >= steps.length) {
+    resetSavedMessages();
+    return {
+      stepIdx: null,
+      messages: fallbackMessages
+    }
+  }
+
+  const { description: existingDescription } = steps[stepIdx];
+  
+  // Check if the step description is the same
+  if (existingDescription !== savedStepDescription) {
+    resetSavedMessages();
+    return {
+      stepIdx: null,
+      messages: fallbackMessages
+    }
+  }
+
+  return {
+    stepIdx: parseInt(savedStepIdx || "0"),
+    messages: JSON.parse(savedStepMessages || JSON.stringify(fallbackMessages))
+  }
+}
+
+function resetSavedMessages() {
+  localStorage.removeItem("savedStepIdx");
+  localStorage.removeItem("savedStepDescription");
+  localStorage.removeItem("savedStepMessages");
+}
+
+function saveMessages(stepIdx: number, description: string, messages: Message[]) {
+  localStorage.setItem("savedStepIdx", stepIdx.toString());
+  localStorage.setItem("savedStepDescription", description);
+  localStorage.setItem("savedStepMessages", JSON.stringify(messages));
+}
+
+export default function App() {
   /* STATES */
   const [designDoc, setDesignDoc] = useState<string | null>(null);
   const [allFiles, setAllFiles] = useState<string[]>([]);
   const [relevantFileContents, setRelevantFileContents] = useState<{ name: string; content: string }[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
-  const [messages, setMessages] = useState<Message[]>([
-      botSays("No design doc found. Make sure design.md is present in the root of your workspace, then reload."),
-    ]
-  );
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isDangoLoading, setIsDangoLoading] = useState(false);
-  const [currentStepIdx, setCurrentStepIdx] = useState(initialStep);
   const [textareaValue, setTextareaValue] = useState<string>("");
   const messagesEndRef = useRef<null | HTMLDivElement>(null)
 
@@ -78,22 +127,20 @@ export default function App() {
 
   const handleDesignDocFound = (designDoc: string) => {
     setDesignDoc(designDoc);
-    const { steps: foundSteps, files } = parseDesignDoc(designDoc);
-    console.log("Found steps:", foundSteps, "Files:", files);
+    const foundSteps = parseDesignDoc(designDoc);
+    console.log("Found steps", foundSteps);
+    
     if (!foundSteps.length) {
-      setMessages([botSays("Design doc found, but unable to read steps. (add to this oops)")]);
+      setMessages([botSays(`Design doc found, but unable to read steps. Reply with '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
+      return;
     }
-
-    //Reset step index if it exceeds the number of steps
-    let stepIdx = currentStepIdx;
-    if (currentStepIdx >= foundSteps.length) {
-      stepIdx = 0;
-      setCurrentStepIdx(stepIdx);
-    }
-
     setSteps(foundSteps);
-    setAllFiles(files);
-    setMessages(getDesignDocConfirmation(foundSteps[stepIdx]));
+    
+    // Get saved step index and messages
+    const { stepIdx, messages: savedMessages } = getSavedMessages(foundSteps, getDesignDocConfirmation(foundSteps[currentStepIdx]));
+    setCurrentStepIdx(stepIdx || 0);
+    setMessages(savedMessages);
+    // Get initial file hierarchy
     getFileHierarchy();
   }
 
@@ -101,24 +148,30 @@ export default function App() {
     //Update file hierarchy at beginning of each step
     getFileHierarchy();
     setCurrentStepIdx(newStep);
-    window.localStorage.setItem("currentStep", newStep.toString());
-    setMessages(getDesignDocConfirmation(steps[newStep]));
+
+    // Check if we're navigating to the "currentStepIdx"; if so, load messages from local storage
+    const fallbackMessages = getDesignDocConfirmation(steps[newStep]);
+    const { stepIdx, messages } = getSavedMessages(steps, fallbackMessages);
+    if (newStep === stepIdx) {
+      setMessages(messages);
+      return;
+    }
+
+    // If there's an existing saved step, notify the user that their conversation will be erased
+    if (stepIdx) {
+      setMessages([
+        ...fallbackMessages,
+        botSays(`(NOTE: Sending messages will erase your conversation on Step ${stepIdx})`)
+      ]);
+    } else {
+      setMessages(fallbackMessages);
+    }
   }
 
   const handleUserMessage = async () => {
     if (!textareaValue) return;
     setTextareaValue("");
-    const command = textareaValue.toLowerCase().split(" ")[0];
-
-    if (!designDoc) {
-      addMessages([botSays("Unable to proceed without a design doc. Make sure design.md is present in the root of your workspace, then reload.")]);
-      return;
-    }
-
-    if (!steps.length) {
-      addMessages([botSays("Unable to proceed without steps. Make sure your design doc has enumerated (1., 2., 3., etc.) steps on new lines, then reload.")]);
-      return;
-    }
+    const command = textareaValue.toUpperCase().split(" ")[0];
 
     // Special commands that require async handling
     const newMessages = [userSays(textareaValue)];
@@ -127,7 +180,8 @@ export default function App() {
     await sendMessage({
       command,
       userMessage: textareaValue,
-      step: steps[currentStepIdx],
+      currentStepIdx,
+      steps,
       designDoc,
       messages,
       paths: allFiles,
@@ -136,14 +190,28 @@ export default function App() {
       generateFile,
       updateDesignDoc,
       readRelevantFiles,
+      generateTemplateDesignDoc,
+      generateStepsAndUpdateDesignDoc,
     }).then((response) => {
       if (response.success) {
         newMessages.push(...response.newMessages);
       } else {
         newMessages.push(botSays("I'm sorry, I couldn't understand that."));
       }
-      addMessages(newMessages);
-      setIsDangoLoading(false);
+
+      // If new messages are generated, that means we can instantly stop the loading state
+      // Else, we need to wait for vscode to respond
+      const allMessages = [...messages, ...newMessages];
+      if (response.newMessages.length) {
+        setMessages(allMessages);
+        setIsDangoLoading(false);
+      }
+
+      // Only save current step to come back to if you send a message in it
+      if (steps) {
+        const { description } = steps[currentStepIdx];
+        saveMessages(currentStepIdx, description, allMessages);
+      }
     });
   }
 
@@ -153,17 +221,27 @@ export default function App() {
       const message = event.data;
       const { type, value } = message;
       console.log("Received message:", message);
-      // Handle non-chat related chat responses (everything else is handled in sendMessage)
+
       switch (type) {
-        case "readDesignDoc":
-          console.log("Received design doc", value);
-          const { success, content } = value;
-          if (!success) return;
-          handleDesignDocFound(content);
+        case "addFile":
+          addMessages([botSays(`Generated ${value.filename}. (Approve? Reject?)`)]);
+          setIsDangoLoading(false);
           break;
-        case "generateTemplateDesignDoc":
-          console.log("Received template design doc request", value);
-          addMessages([botSays("Successfully generated a template design doc at the root of your workspace! Modify it to your needs, then reload.")]);
+        case "updateDesignDoc":
+          if (value) {
+            addMessages([botSays(`Design doc successfully updated. Type '${PLANNING_PHRASE}' to plan this step. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)]);
+          } else {
+            addMessages([botSays(`Failed to update design doc. Please try again.`)]);
+          }
+          setIsDangoLoading(false);
+          break;
+        case "readDesignDoc":
+          if (value.success) {
+            handleDesignDocFound(value.content);
+          } else {
+            setMessages([botSays(`No design doc found. Reply with '${EXECUTE_PHRASE}' to generate a starter template. Or, create design.md with information on your intended project in the root of your workspace.`)]);
+          }
+          setIsDangoLoading(false);
           break;
         case "getFileHierarchy":
           const { paths } = value;
@@ -172,6 +250,22 @@ export default function App() {
         case "readRelevantFiles":
           const { files } = value;
           setRelevantFileContents(files);
+          break;
+        case "generateTemplateDesignDoc":
+          setDesignDoc(value);
+          addMessages([botSays(`Successfully generated a template design doc at the root of your workspace.\n\nWrite about your project then reply '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
+          setIsDangoLoading(false);
+          break;
+        case "generateStepsFromDesignDoc":
+          if (!value.success) return;
+          const steps = value.content;
+          setSteps(steps);
+          addMessages([
+            botSays(`Successfully generated steps from design doc. I recommend you look over & modify the design doc to fit your needs before we get started.`),
+            botSays(`You are currently on ${formatStep(steps[currentStepIdx])}`),
+            botSays(`Type '${PLANNING_PHRASE}' to begin planning the implementation for this current step together. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)
+          ]);
+          setIsDangoLoading(false);
           break;
       }
     }
@@ -189,6 +283,7 @@ export default function App() {
   return (
     <div className="gap-2 pt-6">
       <Chatbox
+        designDoc={designDoc}
         messages={messages}
         currentStepIdx={currentStepIdx}
         steps={steps}
@@ -197,7 +292,6 @@ export default function App() {
         setTextareaValue={setTextareaValue}
         handleUserMessage={handleUserMessage}
         handleStepChange={handleStepChange}
-        handleDesignDocGeneration={generateTemplateDesignDoc}
         messagesEndRef={messagesEndRef}
       />
     </div>

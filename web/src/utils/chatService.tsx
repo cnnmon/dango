@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { ADD_TO_DESIGN_PHRASE, EXECUTE_PHRASE, PLANNING_PHRASE } from "./utils";
+import assert from "assert";
 
 const openai = new OpenAI({
   // @ts-ignore
@@ -27,7 +29,6 @@ export type Message = {
 export type VscodeResponse = {
   code: string;
   filename: string;
-  type: string;
 }
 
 /* UTILITY FUNCTIONS */
@@ -44,10 +45,14 @@ const errorResponse = "I'm sorry, I ran into an error generating a response. Ple
 
 /* CHAT FUNCTIONS */
 
+export const formatStep = (step: Step): string => {
+  return `<b>Step ${step.number}: ${step.description}</b>`;
+}
+
 export const getDesignDocConfirmation = (step: Step): Message[] => {
-  const { description } = step;
   return [
-    botSays(`Hi! I'm Dango and I'm your AI project co-collaborator. Type 'proceed' to work together on the current step:\n\n<b>${description}</b>`),
+    botSays(`You are currently on ${formatStep(step)}`),
+    botSays(`Type '${PLANNING_PHRASE}' to begin planning the implementation for this current step together. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)
   ];
 }
 
@@ -66,9 +71,9 @@ const getInitialPrompt = (designDoc: string, { description, information }: Step)
   ${information && `Additional information:\n${information}`}\n
 
   Your interface allows for the following commands:\n
-  - 'proceed' to move forward with generating code\n
-  - 'add' to add information to the design doc\n
-  - 'code' to generate code or recommendations\n
+  - '${PLANNING_PHRASE}' to let Dango plan and ask about the current step\n
+  - '${ADD_TO_DESIGN_PHRASE}' to add information to the design doc\n
+  - '${EXECUTE_PHRASE}' to generate code or recommendations\n
   These commands should be automatically detected and handled. If the user deviates from these commands, you can remind them of the available commands.\n\n
 `;
 
@@ -111,11 +116,11 @@ const handleInitialDetectiveRequest = async (step: Step, designDoc: string, path
       readRelevantFiles(paths);
       return {
         success: true,
-        newMessages: [botSays("Seems like I have no further questions about this step! Type 'code' to generate code or recommendations.")],
+        newMessages: [botSays(`Seems like I have no further questions about this step! Type '${EXECUTE_PHRASE}' to generate code or recommendations.`)],
       }
     } else {
       const formattedQuestions = questions.map((q: string) => `- ${q}`).join('\n');
-      const questionMessage =  `Before we move on, it would be helpful to answer the question(s):\n\n${formattedQuestions}\n\nYou can:\n- Respond with 'add' followed by your answers and I'll add it to your design doc.\nEdit your design doc directly with more information.\nType 'code' to generate code or recommendations immediately.`
+      const questionMessage =  `Before we move on, it would be helpful to answer the question(s):\n\n${formattedQuestions}\n\nYou can:\n- Respond with '${ADD_TO_DESIGN_PHRASE}' followed by your answers and I'll add it to your design doc.\nEdit your design doc directly with more information.\nType '${EXECUTE_PHRASE}' to generate code or recommendations immediately.`
       return {
         success: true,
         newMessages: [botSays(questionMessage)],
@@ -147,7 +152,7 @@ const handleAddInformationRequest = async ({
     The current step looks like the JSON object:\n
     ${JSON.stringify(step)}\n\n
 
-    The user responded 'add' plus additional information they'd like to add to the design doc relating to this step.\n
+    The user responded '${ADD_TO_DESIGN_PHRASE}' plus additional information they'd like to add to the design doc relating to this step.\n
 
     Keep in mind the design doc structure:\n${designDoc}\n\n
 
@@ -181,10 +186,10 @@ const handleAddInformationRequest = async ({
   if (response.choices[0]?.message.content) {
     const updatedStep = JSON.parse(response.choices[0].message.content);
     console.log("Add response:", response.choices[0].message.content);
-    await updateDesignDoc(updatedStep); // Send it off to vscode to update!
+    updateDesignDoc(updatedStep); // Send it off to vscode to update!
     return {
       success: true,
-      newMessages: [botSays("Design doc successfully updated. Type 'proceed' to continue.")],
+      newMessages: [],
     }
   }
 
@@ -302,10 +307,10 @@ const handleCodeGenerationRequest = async ({
     const { success, step: newStep, code, filename } = JSON.parse(message as string);
 
     if (!success) {
-      await updateDesignDoc(newStep); // Send it off to vscode to update!
+      updateDesignDoc(newStep);
       return {
         success: true,
-        newMessages: [botSays(`I'm unable to generate code for this step, but I've added information to the design doc on what the project owner should do instead.\n\nSay 'approve' to move on to the next step, or 'reject' to try again (these don't work yet oops).`)],
+        newMessages: [],
       }
     }
 
@@ -318,14 +323,14 @@ const handleCodeGenerationRequest = async ({
 
     // If the description of the step has changed as well as the code
     if (step.information !== newStep.information || step.description !== newStep.description) {
-      await updateDesignDoc(newStep); // Send it off to vscode to update!
+      updateDesignDoc(newStep); // Send it off to vscode to update!
     }
 
-    await generateFile({ code, filename, type: "addFile" });
+    generateFile({ code, filename });
 
     return {
       success: true,
-      newMessages: [botSays(`Generated code for ${filename} and opened the file in the editor.\n\nSay 'approve' to move on to the next step, or 'reject' to try again (these don't work yet oops).`)]
+      newMessages: []
     }
   } catch (error) {
     console.log("Error parsing code response:", error);
@@ -339,7 +344,8 @@ const handleCodeGenerationRequest = async ({
 export const sendMessage = async ({
   command,
   userMessage,
-  step,
+  currentStepIdx,
+  steps,
   designDoc,
   messages,
   paths,
@@ -348,25 +354,68 @@ export const sendMessage = async ({
   generateFile,
   updateDesignDoc,
   readRelevantFiles,
+  generateTemplateDesignDoc,
+  generateStepsAndUpdateDesignDoc,
 }: {
   command: string;
   userMessage: string;
-  step: Step;
-  designDoc: string;
+  currentStepIdx: number;
+  steps: Step[];
+  designDoc: string | null;
   messages: Message[];
   paths: string[];
   relevantFileContents: { name: string; content: string }[];
   generateFile: (response: VscodeResponse) => void;
   updateDesignDoc: (stepToUpdate: Step) => void;
   readRelevantFiles: (paths: string[]) => void;
+  generateTemplateDesignDoc: () => void;
+  generateStepsAndUpdateDesignDoc: () => void;
 }): Promise<{
   success: boolean;
   newMessages: Message[];
 }> => {
+  // The only command that can be used to generate design doc & steps
+  if (command === EXECUTE_PHRASE) {
+    if (!designDoc) {
+      // Generate the design doc first
+      generateTemplateDesignDoc();
+      return {
+        success: true,
+        newMessages: [],
+      }
+    }
+
+    if (steps.length === 0) {
+      // Generate steps
+      generateStepsAndUpdateDesignDoc();
+      return {
+        success: true,
+        newMessages: [],
+      }
+    }
+  }
+
+  // If no design doc, return error
+  if (!designDoc) {
+    return {
+      success: false,
+      newMessages: [botSays("Cannot proceed without a design doc.")],
+    }
+  }
+
+  // If no steps, return error
+  if (steps.length === 0) {
+    return {
+      success: false,
+      newMessages: [botSays("Cannot proceed without steps.")],
+    }
+  }
+
+  const step = steps[currentStepIdx];
   switch (command) {
-    case "proceed":
+    case PLANNING_PHRASE:
       return handleInitialDetectiveRequest(step, designDoc, paths, readRelevantFiles);
-    case "add":
+    case ADD_TO_DESIGN_PHRASE:
       return handleAddInformationRequest({
         messages,
         step,
@@ -374,7 +423,7 @@ export const sendMessage = async ({
         userMessage,
         updateDesignDoc
       });
-    case "code":
+    case EXECUTE_PHRASE:
       return handleCodeGenerationRequest({
         messages,
         step,
@@ -385,7 +434,7 @@ export const sendMessage = async ({
         updateDesignDoc,
       });
   }
-  
+
   // Normal chat catch-all (codebase questions, etc.)
   const response = await openai.chat.completions.create({
     messages: [
