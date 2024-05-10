@@ -66,7 +66,6 @@ function getSavedMessages(steps: Step[], fallbackMessages: Message[]) {
   }
 
   const { description: existingDescription } = steps[stepIdx];
-  console.log("Existing description", existingDescription, savedStepDescription);
   
   // Check if the step description is the same
   if (existingDescription !== savedStepDescription) {
@@ -126,6 +125,7 @@ export default function App() {
     setDesignDoc(designDoc);
     const foundSteps = parseDesignDoc(designDoc);
     console.log("Found steps", foundSteps);
+    
     if (!foundSteps.length) {
       setMessages([botSays(`Design doc found, but unable to read steps. Reply with '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
       return;
@@ -214,37 +214,35 @@ export default function App() {
 
       switch (type) {
         case "addFile":
-          console.log("Received file", value);
           addMessages([botSays(`Generated ${value.filename}. (Approve? Reject?)`)]);
           setIsDangoLoading(false);
           break;
         case "updateDesignDoc":
-          console.log("Received update design doc", value);
-          addMessages([botSays(`Design doc successfully updated. Type '${PLANNING_PHRASE}' to plan this step. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)]);
+          if (value) {
+            addMessages([botSays(`Design doc successfully updated. Type '${PLANNING_PHRASE}' to plan this step. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)]);
+          } else {
+            addMessages([botSays(`Failed to update design doc. Please try again.`)]);
+          }
           setIsDangoLoading(false);
           break;
         case "readDesignDoc":
-          console.log("Received design doc", value);
-          if (!value.success) {
-            setMessages([botSays(`No design doc found. Reply with '${EXECUTE_PHRASE}' to generate a starter template. Or, create design.md with information on your intended project in the root of your workspace.`)]);
-          } else {
+          if (value.success) {
             handleDesignDocFound(value.content);
+          } else {
+            setMessages([botSays(`No design doc found. Reply with '${EXECUTE_PHRASE}' to generate a starter template. Or, create design.md with information on your intended project in the root of your workspace.`)]);
           }
           setIsDangoLoading(false);
           break;
         case "readAllFiles":
-          console.log("Received all files", value);
           const { files } = value;
           setAllFileContents(files);
           break;
         case "generateTemplateDesignDoc":
-          console.log("Received generated steps", value);
           setDesignDoc(value);
           addMessages([botSays(`Successfully generated a template design doc at the root of your workspace.\n\nWrite about your project then reply '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
           setIsDangoLoading(false);
           break;
         case "generateStepsFromDesignDoc":
-          console.log("Received generated steps", value);
           if (!value.success) return;
           const steps = value.content;
           setSteps(steps);
