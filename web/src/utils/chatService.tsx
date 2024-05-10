@@ -52,7 +52,7 @@ export const formatStep = (step: Step): string => {
 export const getDesignDocConfirmation = (step: Step): Message[] => {
   return [
     botSays(`You are currently on ${formatStep(step)}`),
-    botSays(`Type '${PLANNING_PHRASE}' to begin planning the implementation for this current step together.`)
+    botSays(`Type '${PLANNING_PHRASE}' to begin planning the implementation for this current step together. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)
   ];
 }
 

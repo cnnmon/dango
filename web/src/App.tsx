@@ -154,7 +154,7 @@ export default function App() {
           break;
         case "updateDesignDoc":
           console.log("Received update design doc", value);
-          addMessages([botSays(`Design doc successfully updated. Type '${PLANNING_PHRASE}' to continue.`)]);
+          addMessages([botSays(`Design doc successfully updated. Type '${PLANNING_PHRASE}' to plan this step. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)]);
           setIsDangoLoading(false);
           break;
         case "readDesignDoc":
@@ -182,7 +182,7 @@ export default function App() {
           addMessages([
             botSays(`Successfully generated steps from design doc. I recommend you look over & modify the design doc to fit your needs before we get started.`),
             botSays(`You are currently on ${formatStep(steps[currentStepIdx])}`),
-            botSays(`Type '${PLANNING_PHRASE}' to begin planning the implementation for this current step together.`)
+            botSays(`Type '${PLANNING_PHRASE}' to begin planning the implementation for this current step together. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)
           ]);
           setIsDangoLoading(false);
           break;
