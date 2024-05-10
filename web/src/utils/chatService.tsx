@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 import { ADD_TO_DESIGN_PHRASE, EXECUTE_PHRASE, PLANNING_PHRASE } from "./utils";
-import assert from "assert";
 
 const openai = new OpenAI({
   // @ts-ignore
@@ -52,8 +51,13 @@ export const formatStep = (step: Step): string => {
 export const getDesignDocConfirmation = (step: Step): Message[] => {
   return [
     botSays(`You are currently on ${formatStep(step)}`),
-    botSays(`Type '${PLANNING_PHRASE}' to begin planning the implementation for this current step together. If you want to generate immediately, type '${EXECUTE_PHRASE}'.`)
+    getChatInstructions(),
   ];
+}
+
+export const getChatInstructions = (): Message => {
+  const instructions = `Type <b>${PLANNING_PHRASE}</b> to think through the implementation with Dango.\nType <b>${EXECUTE_PHRASE}</b> to generate this step immediately.\nOr, ask any questions you might have.`;
+  return botSays(instructions);
 }
 
 /* HANDLE USER MESSAGES AND SPECIAL REQUESTS */
@@ -70,10 +74,13 @@ const getInitialPrompt = (designDoc: string, { description, information }: Step)
   You are currently on step ${description}.\n
   ${information && `Additional information:\n${information}`}\n
 
-  Your interface allows for the following commands:\n
-  - '${PLANNING_PHRASE}' to let Dango plan and ask about the current step\n
-  - '${ADD_TO_DESIGN_PHRASE}' to add information to the design doc\n
-  - '${EXECUTE_PHRASE}' to generate code or recommendations\n
+  If the user asks for help, tell them your interface allows for the following commands:\n
+  Type ${PLANNING_PHRASE} to let Dango plan and ask about the current step\n
+  Type ${ADD_TO_DESIGN_PHRASE} to add information to the design doc\n
+  Type ${EXECUTE_PHRASE} to generate code or recommendations\n
+
+  If the user wants to reset the design doc or step, they can click off the current tab and back to reset the memory of the design doc.\n\n
+
   These commands should be automatically detected and handled. If the user deviates from these commands, you can remind them of the available commands.\n\n
 `;
 
@@ -116,14 +123,19 @@ const handleInitialDetectiveRequest = async (step: Step, designDoc: string, path
       readRelevantFiles(paths);
       return {
         success: true,
-        newMessages: [botSays(`Seems like I have no further questions about this step! Type '${EXECUTE_PHRASE}' to generate code or recommendations.`)],
+        newMessages: [botSays(`Seems like I have no further questions about this step! Type <b>${EXECUTE_PHRASE}</b> to generate code or recommendations.`)],
       }
     } else {
       const formattedQuestions = questions.map((q: string) => `- ${q}`).join('\n');
-      const questionMessage =  `Before we move on, it would be helpful to answer the question(s):\n\n${formattedQuestions}\n\nYou can:\n- Respond with '${ADD_TO_DESIGN_PHRASE}' followed by your answers and I'll add it to your design doc.\nEdit your design doc directly with more information.\nType '${EXECUTE_PHRASE}' to generate code or recommendations immediately.`
+      const questionMessage =  `Before we move on, it would be helpful to answer the question(s):\n\n${formattedQuestions}`
+      const instructionMessage = `Type ${ADD_TO_DESIGN_PHRASE} plus your answers to any of these questions, and I'll add it to your design doc for future reference. Or, you can type <b>${EXECUTE_PHRASE}</b> to generate immediately.`;
+
       return {
         success: true,
-        newMessages: [botSays(questionMessage)],
+        newMessages: [
+          botSays(questionMessage),
+          botSays(instructionMessage),
+        ],
       }
     }
   } catch (error) {
@@ -354,8 +366,6 @@ export const sendMessage = async ({
   generateFile,
   updateDesignDoc,
   readRelevantFiles,
-  generateTemplateDesignDoc,
-  generateStepsAndUpdateDesignDoc,
 }: {
   command: string;
   userMessage: string;
@@ -368,34 +378,11 @@ export const sendMessage = async ({
   generateFile: (response: VscodeResponse) => void;
   updateDesignDoc: (stepToUpdate: Step) => void;
   readRelevantFiles: (paths: string[]) => void;
-  generateTemplateDesignDoc: () => void;
-  generateStepsAndUpdateDesignDoc: () => void;
 }): Promise<{
   success: boolean;
   newMessages: Message[];
 }> => {
-  // The only command that can be used to generate design doc & steps
-  if (command === EXECUTE_PHRASE) {
-    if (!designDoc) {
-      // Generate the design doc first
-      generateTemplateDesignDoc();
-      return {
-        success: true,
-        newMessages: [],
-      }
-    }
-
-    if (steps.length === 0) {
-      // Generate steps
-      generateStepsAndUpdateDesignDoc();
-      return {
-        success: true,
-        newMessages: [],
-      }
-    }
-  }
-
-  // If no design doc, return error
+  // If no design doc, return error (this is realistically never happen since the user should be reset to landing)
   if (!designDoc) {
     return {
       success: false,
