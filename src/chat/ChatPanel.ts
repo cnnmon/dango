@@ -1,6 +1,18 @@
 import * as vscode from 'vscode';
-import { readDesignDoc, addFile, updateDesignDoc, readAllFiles } from '../utils';
+import { readDesignDoc, addFile, updateDesignDoc, readAllFiles, Step, generateSteps } from '../utils';
 import { templateDesignDoc } from '../constants';
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  // @ts-ignore
+  apiKey: process.env.OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true,
+});
+
+type CodeGenerationRequest = {
+  code: string;
+  filename: string;
+}
 
 export class ChatPanel implements vscode.WebviewViewProvider {
   private readonly disposables: vscode.Disposable[] = [];
@@ -31,7 +43,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
 
     this.onDidReceiveMessage((message: {
       type: string;
-      value?: string | number | { code: string, filename: string } | { number: number, description: string, information: string };
+      value?: string | number | CodeGenerationRequest | Step | Step[];
     }) => {
       switch (message.type) {
         case "readDesignDoc":
@@ -43,7 +55,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
           });
           break;
         case "addFile":
-          const { code, filename } = message.value as { code: string, filename: string };
+          const { code, filename } = message.value as CodeGenerationRequest;
           addFile(filename, code).then(() => {
             this.postMessageToWebview({
               type: "addFile",
@@ -54,7 +66,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
         case "updateDesignDoc":
           const stepToUpdate = message.value as { number: number, description: string, information: string };
           vscode.window.showInformationMessage(`Updating step ${JSON.stringify(message.value)}`);
-          updateDesignDoc(stepToUpdate).then((result) => {
+          updateDesignDoc([stepToUpdate]).then((result) => {
             this.postMessageToWebview({
               type: "updateDesignDoc",
               value: result
@@ -69,15 +81,22 @@ export class ChatPanel implements vscode.WebviewViewProvider {
             });
           });
           break;
-        case "readAllFiles":
-          readAllFiles().then((result) => {
-            this.postMessageToWebview({
-              type: "readAllFiles",
-              value: {
-                files: result
-              }
+        case "generateStepsFromDesignDoc":
+            generateSteps(openai).then((result) => {
+              this.postMessageToWebview({
+                type: "generateStepsFromDesignDoc",
+                value: result
+              });
             });
-          });
+          case "readAllFiles":
+            readAllFiles().then((result) => {
+              this.postMessageToWebview({
+                type: "readAllFiles",
+                value: {
+                  files: result
+                }
+              });
+            });
           break;
         default:
           vscode.window.showInformationMessage(`Received unknown message: ${JSON.stringify(message)}`);

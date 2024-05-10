@@ -7,18 +7,17 @@ import {
   botSays,
   VscodeResponse,
   Step,
+  formatStep,
 } from "./utils/chatService";
 import Chatbox from "./Chatbox";
-import { parseDesignDoc } from "./utils/utils";
+import { EXECUTE_PHRASE, PLANNING_PHRASE, parseDesignDoc } from "./utils/utils";
 
 /* VSCODE FUNCTIONS */
 // @ts-ignore
 declare const vscode: VSCode;
 
 function readDesignDoc() {
-  return vscode.postMessage({
-    type: 'readDesignDoc',
-  });
+  return vscode.postMessage({ type: 'readDesignDoc' });
 }
 
 function generateFile(response: VscodeResponse) {
@@ -37,6 +36,10 @@ function generateTemplateDesignDoc() {
   return vscode.postMessage({ type: "generateTemplateDesignDoc" });
 }
 
+async function generateStepsAndUpdateDesignDoc() {
+  vscode.postMessage({ type: "generateStepsFromDesignDoc" });
+}
+
 /* MAIN APP */
 
 export default function App() {
@@ -45,11 +48,11 @@ export default function App() {
 
   /* STATES */
   const [designDoc, setDesignDoc] = useState<string | null>(null);
-  const [allFiles, setAllFiles] = useState<string[]>([]);
   const [allFileContents, setAllFileContents] = useState<{ name: string; content: string }[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [messages, setMessages] = useState<Message[]>([
-      botSays("No design doc found. Make sure design.md is present in the root of your workspace, then reload."),
+      botSays(`Hi! I'm Dango, your project co-collaborator. I work off of your design doc to generate code and improve your workflow. Let's get started!`),
+      botSays(`No design doc found. Reply with '${EXECUTE_PHRASE}' to generate a starter template. Or, create design.md with information on your intended project in the root of your workspace.`),
     ]
   );
   const [isDangoLoading, setIsDangoLoading] = useState(false);
@@ -75,13 +78,12 @@ export default function App() {
 
   const handleDesignDocFound = (designDoc: string) => {
     setDesignDoc(designDoc);
-    const { steps: foundSteps, files } = parseDesignDoc(designDoc);
-    console.log("Found steps:", foundSteps, "Files:", files);
+    const foundSteps = parseDesignDoc(designDoc);
     if (!foundSteps.length) {
-      setMessages([botSays("Design doc found, but unable to read steps. (add to this oops)")]);
+      setMessages([botSays(`Design doc found, but unable to read steps. Reply with '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
+      return;
     }
     setSteps(foundSteps);
-    setAllFiles(files);
     setMessages(getDesignDocConfirmation(foundSteps[currentStepIdx]));
   }
 
@@ -94,17 +96,7 @@ export default function App() {
   const handleUserMessage = async () => {
     if (!textareaValue) return;
     setTextareaValue("");
-    const command = textareaValue.toLowerCase().split(" ")[0];
-
-    if (!designDoc) {
-      addMessages([botSays("Unable to proceed without a design doc. Make sure design.md is present in the root of your workspace, then reload.")]);
-      return;
-    }
-
-    if (!steps.length) {
-      addMessages([botSays("Unable to proceed without steps. Make sure your design doc has enumerated (1., 2., 3., etc.) steps on new lines, then reload.")]);
-      return;
-    }
+    const command = textareaValue.toUpperCase().split(" ")[0];
 
     // Special commands that require async handling
     const newMessages = [userSays(textareaValue)];
@@ -113,21 +105,29 @@ export default function App() {
     await sendMessage({
       command,
       userMessage: textareaValue,
-      step: steps[currentStepIdx],
+      currentStepIdx,
+      steps,
       designDoc,
       messages,
       /* VSCODE FUNCTIONS */
       generateFile,
       updateDesignDoc,
       readAllFiles,
+      generateTemplateDesignDoc,
+      generateStepsAndUpdateDesignDoc,
     }).then((response) => {
       if (response.success) {
         newMessages.push(...response.newMessages);
       } else {
         newMessages.push(botSays("I'm sorry, I couldn't understand that."));
       }
-      addMessages(newMessages);
-      setIsDangoLoading(false);
+
+      // If new messages are generated, that means we can instantly stop the loading state
+      // Else, we need to wait for vscode to respond
+      if (response.newMessages.length) {
+        addMessages(newMessages);
+        setIsDangoLoading(false);
+      }
     });
   }
 
@@ -137,23 +137,45 @@ export default function App() {
       const message = event.data;
       const { type, value } = message;
       console.log("Received message:", message);
-      // Handle non-chat related chat responses (everything else is handled in sendMessage)
       switch (type) {
+        case "addFile":
+          console.log("Received file", value);
+          addMessages([botSays(`Generated ${value.filename}. (Approve? Reject?)`)]);
+          setIsDangoLoading(false);
+          break;
+        case "updateDesignDoc":
+          console.log("Received update design doc", value);
+          addMessages([botSays(`Design doc successfully updated. Type '${PLANNING_PHRASE}' to continue.`)]);
+          setIsDangoLoading(false);
+          break;
         case "readDesignDoc":
           console.log("Received design doc", value);
-          const { success, content } = value;
-          if (!success) return;
-          handleDesignDocFound(content);
-          break;
-        case "generateTemplateDesignDoc":
-          console.log("Received template design doc request", value);
-          addMessages([botSays("Successfully generated a template design doc at the root of your workspace! Modify it to your needs, then reload.")]);
+          if (!value.success) return;
+          handleDesignDocFound(value.content);
+          setIsDangoLoading(false);
           break;
         case "readAllFiles":
           console.log("Received all files", value);
-          const bruh = designDoc;
           const { files } = value;
           setAllFileContents(files);
+          break;
+        case "generateTemplateDesignDoc":
+          console.log("Received generated steps", value);
+          setDesignDoc(value);
+          addMessages([botSays(`Successfully generated a template design doc at the root of your workspace.\n\nWrite about your project then reply '${EXECUTE_PHRASE}' and I'll generate steps for us to work on. (This might take a minute or two.)`)]);
+          setIsDangoLoading(false);
+          break;
+        case "generateStepsFromDesignDoc":
+          console.log("Received generated steps", value);
+          if (!value.success) return;
+          const steps = value.content;
+          setSteps(steps);
+          addMessages([
+            botSays(`Successfully generated steps from design doc. I recommend you look over & modify the design doc to fit your needs before we get started.`),
+            botSays(`You are currently on ${formatStep(steps[currentStepIdx])}`),
+            botSays(`Type '${PLANNING_PHRASE}' to begin planning the implementation for this current step together.`)
+          ]);
+          setIsDangoLoading(false);
           break;
       }
     }
@@ -171,6 +193,7 @@ export default function App() {
   return (
     <div className="gap-2 pt-6">
       <Chatbox
+        designDoc={designDoc}
         messages={messages}
         currentStepIdx={currentStepIdx}
         steps={steps}
@@ -179,7 +202,6 @@ export default function App() {
         setTextareaValue={setTextareaValue}
         handleUserMessage={handleUserMessage}
         handleStepChange={handleStepChange}
-        handleDesignDocGeneration={generateTemplateDesignDoc}
         messagesEndRef={messagesEndRef}
       />
     </div>

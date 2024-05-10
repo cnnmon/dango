@@ -1,3 +1,7 @@
+export const PLANNING_PHRASE = 'PLAN';
+export const EXECUTE_PHRASE = 'GO';
+export const ADD_TO_DESIGN_PHRASE = 'ADD';
+
 export function ellipses(text, maxChars = 5) {
   if (!text) return text;
   return text.length > maxChars ? `${text.substring(0, maxChars)}...` : text;
@@ -24,11 +28,10 @@ export function parseAndFormatMessageText(inputText) {
 }
 
 export function parseDesignDoc(inputText) {
-  const stepHeaderPattern = /^##\s+(.*)$/;
+  const stepHeaderPattern = /^##\s+\d+\.\s*(.*)$/;
   const sectionPattern = /^# (.*)$/;
 
   let steps = [];
-  let filePaths = [];
 
   let lines = inputText.split('\n');
   let currentStep = null;
@@ -56,8 +59,6 @@ export function parseDesignDoc(inputText) {
       } else if (currentStep) {
         currentStep.information += line.trim() + ' ';
       }
-    } else if (currentSection === 'Files') {
-      filePaths.push(line);
     }
   });
 
@@ -65,8 +66,5 @@ export function parseDesignDoc(inputText) {
     steps.push(currentStep);
   }
 
-  return {
-    steps,
-    files: filePaths,
-  };
+  return steps;
 }

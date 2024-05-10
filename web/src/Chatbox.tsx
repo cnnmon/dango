@@ -26,18 +26,18 @@ function NavButton({ currentStepIdx, steps, handleStepChange, direction }: {
   );
 }
 
-function StepFooter({ currentStepIdx, steps, handleStepChange, handleDesignDocGeneration }: {
+function StepFooter({
+  designDoc, currentStepIdx, steps, handleStepChange
+}: {
+  designDoc: string | null,
   currentStepIdx: number,
   steps: Step[],
   handleStepChange: (newStep: number) => void,
-  handleDesignDocGeneration: () => void,
 }) {
-  if (steps.length === 0) {
+  if (!designDoc || steps.length === 0) {
     return (
-      <button className="subtitle text-center w-full" onClick={handleDesignDocGeneration}>
-        "Help me create a design doc!"
-      </button>
-    )
+      <></>
+    );
   }
 
   const currentStep = steps[currentStepIdx];
@@ -63,17 +63,18 @@ function StepFooter({ currentStepIdx, steps, handleStepChange, handleDesignDocGe
 
 export default function Chatbox({
   messages,
+  designDoc,
   currentStepIdx,
   steps,
   isDangoLoading,
   handleUserMessage,
   handleStepChange,
-  handleDesignDocGeneration,
   textareaValue,
   setTextareaValue,
   messagesEndRef,
 }: {
   messages: Message[],
+  designDoc: string | null,
   currentStepIdx: number,
   steps: Step[],
   isDangoLoading: boolean,
@@ -81,7 +82,6 @@ export default function Chatbox({
   setTextareaValue: React.Dispatch<React.SetStateAction<string>>,
   handleUserMessage: () => void,
   handleStepChange: (newStep: number) => void,
-  handleDesignDocGeneration: () => void,
   messagesEndRef: React.RefObject<HTMLDivElement>,
 }) {
   return (
@@ -114,10 +114,10 @@ export default function Chatbox({
 
       <div className="mt-2">
         <StepFooter
+          designDoc={designDoc}
           currentStepIdx={currentStepIdx}
           steps={steps}
           handleStepChange={handleStepChange}
-          handleDesignDocGeneration={handleDesignDocGeneration}
         />
       </div>
     </>

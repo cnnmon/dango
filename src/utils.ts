@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
 
+export type Step = {
+  number: number;
+  description: string;
+  information: string;
+}
+
 async function findDesignDoc(outputChannel: vscode.OutputChannel) {
   // Find the design document
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -43,58 +49,10 @@ async function readDesignDoc() {
       content: '',
     };
 
-  const { content, uri: designDocUri } = designDoc;
-  let newContent = content;
-
-  // Get file hierarchy
-  const hierarchy = await vscode.workspace.findFiles(
-    '**/*',
-    '**/node_modules/**',
-    500
-  );
-  const hierarchyText = hierarchy
-    .sort((a, b) => a.path.localeCompare(b.path))
-    .join('\n');
-  const hierarchySection = `# Files\n${hierarchyText}`;
-
-  // Check if "# Files" header exists
-  const filesHeaderIndex = content.indexOf('# Files');
-  if (filesHeaderIndex !== -1) {
-    const endOfSectionIndex = content.indexOf('\n#', filesHeaderIndex + 1);
-    if (endOfSectionIndex !== -1) {
-      newContent =
-        content.substring(0, filesHeaderIndex) +
-        hierarchySection +
-        '\n' +
-        content.substring(endOfSectionIndex);
-    } else {
-      newContent = content.substring(0, filesHeaderIndex) + hierarchySection;
-    }
-  } else {
-    newContent += '\n\n' + hierarchySection;
-  }
-
-  // Check if "# Files" header needs updating
-  if (newContent === content) {
-    outputChannel.appendLine(
-      'Design document already contains file hierarchy.'
-    );
-    return {
-      success: true,
-      content: newContent,
-    };
-  }
-
-  // Write the updated content back to the design document
-  const textEncoder = new TextEncoder();
-  await vscode.workspace.fs.writeFile(
-    designDocUri,
-    textEncoder.encode(newContent)
-  );
-  outputChannel.appendLine('Design document updated successfully!');
+  const { content } = designDoc;
   return {
     success: true,
-    content: newContent,
+    content: content,
   };
 }
 
@@ -142,7 +100,8 @@ async function addFile(fileName: string, rawContent: string) {
 }
 
 // With a new step object, update the design document
-async function updateDesignDoc(updatedStep: { number: number, description: string, information: string }) {
+// Not built to delete any steps; we expect users to delete steps themselves if they want to
+async function updateDesignDoc(steps: Step[]) {
   const outputChannel = vscode.window.createOutputChannel('Update Design Doc');
   outputChannel.clear();
   outputChannel.show(true);
@@ -160,29 +119,56 @@ async function updateDesignDoc(updatedStep: { number: number, description: strin
     let updatedText = [];
     let inStepsSection = false;
     let currentStepNumber = 0;
-    let finishedInformation = false;
-  
-    sections.forEach(section => {
+    
+    // Deep copy the steps array
+    const updatedSteps = steps.map(step => ({ ...step }));
+    let currentUpdatedStep = updatedSteps.shift();
+    
+    function addStepText(step) {
+      updatedText.push(`\n## ${step.number}. ${step.description}`);
+      updatedText.push(step.information);
+    }
+    
+    sections.forEach((section) => {
       if (inStepsSection) {
-        if (section.startsWith('##')) { // is description
+        if (!currentUpdatedStep) { // New step but no updated steps anymore
+          inStepsSection = false;
+          return;
+        } else if (section.startsWith('##')) { // New step
           currentStepNumber += 1;
-          if (currentStepNumber === updatedStep.number) {
-            updatedText.push(`## ${updatedStep.description}`);
+          if (currentStepNumber === currentUpdatedStep.number) { // If a match, replace the description
+            addStepText(currentUpdatedStep);
+            currentUpdatedStep = updatedSteps.shift();
             return;
           }
-        } else { // is information
-          if (currentStepNumber === updatedStep.number && !finishedInformation) {
-            finishedInformation = true;
-            updatedText.push(updatedStep.information + '\n');
-            return;
+        } else if (section.startsWith('#')) { // New section -- we are about to leave this section!
+          while (currentUpdatedStep) {
+            addStepText(currentUpdatedStep);
+            currentUpdatedStep = updatedSteps.shift();
           }
+        } else {
+          return; // Skip other lines (not important probably)
         }
-      } else if (section.startsWith('# Steps')) {
+      }
+    
+      if (section.startsWith('# Steps')) {
         inStepsSection = true;
       }
+    
       updatedText.push(section);
     });
     
+    // Dump steps at the bottom if no existing # Steps section
+    if (currentUpdatedStep) {
+      updatedText.push('\n# Steps');
+    
+      // Get any remaining steps if another section doesn't exist
+      while (currentUpdatedStep) {
+        addStepText(currentUpdatedStep);
+        currentUpdatedStep = updatedSteps.shift();
+      }
+    }    
+
     const newContent = updatedText.join('\n');
     outputChannel.appendLine(`\nNew content preview:\n${newContent}\n`);
 
@@ -227,6 +213,74 @@ async function readAllFiles() {
   return fileContents;
 }
 
+// Read current design doc, generate steps, and add those steps to the design doc
+async function generateSteps(openai: any) {
+  const { content: designDoc } = await readDesignDoc();
+  if (!designDoc) {
+    return {
+      success: false,
+      content: [],
+    };
+  }
 
+  // Use OpenAI to generate steps
+  const generateStepsPrompt = `
+    Given the design doc:\n${designDoc}\n\n
 
-export { addFile, readDesignDoc, updateDesignDoc, readAllFiles};
+    Generate a list of steps that need to be taken to complete the project from scratch to a functional minimum viable product (MVP). Each step should be small enough such that you can generate one file or a small piece of code for each step. If there a step you can't generate code for (for example, requiring assets or external tools), provide information on what the project owner should do instead.\n\n
+    
+    You may ONLY respond in the following JSON format:\n
+    {\n
+      "steps": list of objects where each object has the following keys:\n
+      - "description": short string describing the step at a high level,\n
+      - "information": string of additional information needed for the step that may be helpful for the project owner to know,\n
+    }\n\n
+
+    For example, given a design doc that says "Develop a project to convert each word in a string from the command line into 'meow'.", you might respond with:\n
+    {\n
+      "steps": [\n
+        {"description": "Create a Python file named meow.py."},\n
+        {"description": "Write a program that converts each word in a string to 'meow'.", "information": "Use the split() method to separate each word in the string."},\n
+      ]\n
+    }\n
+
+    Use concise, clear wording and short sentences.
+  `;
+  
+  try {
+    const response = await openai.chat.completions.create({
+      messages: [{ role: "system", content: generateStepsPrompt }],
+      model: "gpt-4-turbo",
+    });
+
+    const message = response.choices[0]?.message.content;
+    const { steps } = JSON.parse(message as string);
+    
+    // Set the step numbers
+    steps.forEach((step: Step, idx: number) => {
+      step.number = idx + 1;
+    });
+    
+    // Add steps to the design doc
+    const updatedDesignDoc = await updateDesignDoc(steps);
+    if (!updatedDesignDoc) {
+      return {
+        success: false,
+        content: [],
+      };
+    }
+
+    return {
+      success: true,
+      content: steps,
+    }
+  } catch (error) {
+    console.log("Error parsing code response:", error);
+    return {
+      success: false,
+      content: [],
+    }
+  }
+}
+
+export { addFile, readDesignDoc, updateDesignDoc, readAllFiles, generateSteps };
