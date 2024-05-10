@@ -245,6 +245,35 @@ async function readAllFiles() {
   return fileContents;
 }
 
+// Returns the file hierarchy as a list of strings
+async function getFileHierarchy() {
+  // Get file hierarchy
+  const hierarchy = await vscode.workspace.findFiles(
+    '**/*',
+    '**/node_modules/**',
+    500
+  );
+  const paths = hierarchy.map(file => file.path);
+  paths.sort((a, b) => a.localeCompare(b));
+  return paths;
+}
+
+// Returns relevant files as a list of objects containing relative path and content
+async function readRelevantFiles(paths: string[]) {
+  console.log("VSCODE: reading relevant files ... ", paths)
+  const fileContents = [];
+  for (const path of paths) {
+    const fileUri = vscode.Uri.parse(path);
+    const fileContentBuffer = await vscode.workspace.fs.readFile(fileUri);
+    const fileContent = new TextDecoder().decode(fileContentBuffer);
+
+    //Extract relative path from path
+    const relativePath = vscode.workspace.asRelativePath(fileUri, false);
+
+    fileContents.push({ name: relativePath, content: fileContent });
+  }
+  return fileContents;
+}
 // Read current design doc, generate steps, and add those steps to the design doc
 async function generateSteps(openai: any) {
   const { content: designDoc } = await readDesignDoc();
@@ -483,4 +512,4 @@ async function generate(openai: any, step: Step) {
   }
 }
 
-export { addFile, readDesignDoc, updateDesignDoc, generate, generateSteps };
+export { addFile, readDesignDoc, updateDesignDoc, generate, generateSteps, readAllFiles, getFileHierarchy, readRelevantFiles };

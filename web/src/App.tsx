@@ -124,7 +124,7 @@ export default function App() {
     }
 
     setSteps(foundSteps);
-
+    
     // Get saved step index and messages
     const { stepIdx, messages: savedMessages } = getSavedMessages(foundSteps);
     if (savedMessages && stepIdx !== null && stepIdx > 0) {
