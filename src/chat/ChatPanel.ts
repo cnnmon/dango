@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { readDesignDoc, addFile, updateDesignDoc, readAllFiles } from '../utils';
+import { readDesignDoc, addFile, updateDesignDoc, readAllFiles, getFileHierarchy, readRelevantFiles } from '../utils';
 import { templateDesignDoc } from '../constants';
 
 export class ChatPanel implements vscode.WebviewViewProvider {
@@ -31,7 +31,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
 
     this.onDidReceiveMessage((message: {
       type: string;
-      value?: string | number | { code: string, filename: string } | { number: number, description: string, information: string };
+      value?: string | number | string[] | { code: string, filename: string } | { number: number, description: string, information: string };
     }) => {
       switch (message.type) {
         case "readDesignDoc":
@@ -73,6 +73,26 @@ export class ChatPanel implements vscode.WebviewViewProvider {
           readAllFiles().then((result) => {
             this.postMessageToWebview({
               type: "readAllFiles",
+              value: {
+                files: result
+              }
+            });
+          });
+          break;
+        case "getFileHierarchy":
+          getFileHierarchy().then((result) => {
+            this.postMessageToWebview({
+              type: "getFileHierarchy",
+              value: {
+                paths: result
+              }
+            });
+          });
+        case "readRelevantFiles":
+          const paths = message.value as string[];
+          readRelevantFiles(paths).then((result) => {
+            this.postMessageToWebview({
+              type: "readRelevantFiles",
               value: {
                 files: result
               }

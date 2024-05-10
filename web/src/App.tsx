@@ -37,6 +37,14 @@ function generateTemplateDesignDoc() {
   return vscode.postMessage({ type: "generateTemplateDesignDoc" });
 }
 
+function getFileHierarchy() {
+  return vscode.postMessage({ type: "getFileHierarchy" });
+}
+
+function readRelevantFiles(paths: string[]) {
+  return vscode.postMessage({ type: "readRelevantFiles", value: paths });
+}
+
 /* MAIN APP */
 
 export default function App() {
@@ -46,7 +54,7 @@ export default function App() {
   /* STATES */
   const [designDoc, setDesignDoc] = useState<string | null>(null);
   const [allFiles, setAllFiles] = useState<string[]>([]);
-  const [allFileContents, setAllFileContents] = useState<{ name: string; content: string }[]>([]);
+  const [relevantFileContents, setRelevantFileContents] = useState<{ name: string; content: string }[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [messages, setMessages] = useState<Message[]>([
       botSays("No design doc found. Make sure design.md is present in the root of your workspace, then reload."),
@@ -59,11 +67,6 @@ export default function App() {
 
   const addMessages = (newMessages: Message[]) => {
     setMessages([...messages, ...newMessages]);
-  }
-
-  const readAllFiles = async () => {
-    vscode.postMessage({ type: "readAllFiles" });
-    return allFileContents;
   }
 
   useEffect(() => {
@@ -91,9 +94,12 @@ export default function App() {
     setSteps(foundSteps);
     setAllFiles(files);
     setMessages(getDesignDocConfirmation(foundSteps[stepIdx]));
+    getFileHierarchy();
   }
 
   const handleStepChange = (newStep: number) => {
+    //Update file hierarchy at beginning of each step
+    getFileHierarchy();
     setCurrentStepIdx(newStep);
     window.localStorage.setItem("currentStep", newStep.toString());
     setMessages(getDesignDocConfirmation(steps[newStep]));
@@ -124,10 +130,12 @@ export default function App() {
       step: steps[currentStepIdx],
       designDoc,
       messages,
+      paths: allFiles,
+      relevantFileContents,
       /* VSCODE FUNCTIONS */
       generateFile,
       updateDesignDoc,
-      readAllFiles,
+      readRelevantFiles,
     }).then((response) => {
       if (response.success) {
         newMessages.push(...response.newMessages);
@@ -157,11 +165,13 @@ export default function App() {
           console.log("Received template design doc request", value);
           addMessages([botSays("Successfully generated a template design doc at the root of your workspace! Modify it to your needs, then reload.")]);
           break;
-        case "readAllFiles":
-          console.log("Received all files", value);
-          const bruh = designDoc;
+        case "getFileHierarchy":
+          const { paths } = value;
+          setAllFiles(paths);
+          break;
+        case "readRelevantFiles":
           const { files } = value;
-          setAllFileContents(files);
+          setRelevantFileContents(files);
           break;
       }
     }

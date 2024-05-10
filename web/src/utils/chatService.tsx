@@ -72,20 +72,25 @@ const getInitialPrompt = (designDoc: string, { description, information }: Step)
   These commands should be automatically detected and handled. If the user deviates from these commands, you can remind them of the available commands.\n\n
 `;
 
-const handleInitialDetectiveRequest = async (step: Step, designDoc: string) => {
+const handleInitialDetectiveRequest = async (step: Step, designDoc: string, paths: string[], readRelevantFiles: (paths: string[]) => void) => {
   const additionalQuestioningPrompt = `
-    By the information provided, do you think you can generate relevant code for this step? Is there any other information you would need to generate correct code? If so, what questions would you like to ask the project's owner to clarify things?\n\n
+    The current list of files in the project is:\n${paths.join('\n')}\n\n
+
+    By the information provided, do you think you can generate relevant code for this step? Is there any other information you would need to generate correct code? If so, what questions would you like to ask the project's owner to clarify things?\n
+    If you think you can generate relevant code, also include a list of relevant files you would like to access when generating code. Each file you include will have its contents pasted for you to access before generating code. \n\n
 
     You may ONLY respond in the following JSON format:\n
     {\n
       "ready": boolean where true means you are ready to generate code with no questions,\n
       "questions": list of strings where each string is a question you have for the project's owner,\n
+      "paths": list of strings of relevant file paths\n
     }\n\n
 
     An example response is:\n
     {\n
       "ready": false,\n
       "questions": ["What is the expected output of the program?", "What is the language of the program?"],\n
+      "paths": ["file:///Users/john/projects/game/setup.py", "file:///Users/john/projects/game/play.py"]\n
     }\n
   `;
 
@@ -100,8 +105,10 @@ const handleInitialDetectiveRequest = async (step: Step, designDoc: string) => {
 
   try {
     const message = response.choices[0]?.message.content;
-    const { ready, questions } = JSON.parse(message as string);
+    const { ready, questions, paths } = JSON.parse(message as string);
     if (ready) {
+      console.log("Relevant paths identified: ", paths);
+      readRelevantFiles(paths);
       return {
         success: true,
         newMessages: [botSays("Seems like I have no further questions about this step! Type 'code' to generate code or recommendations.")],
@@ -192,41 +199,31 @@ const handleCodeGenerationRequest = async ({
   step,
   designDoc,
   userMessage,
+  relevantFileContents,
   generateFile,
   updateDesignDoc,
-  readAllFiles,
 }: {
   messages: Message[],
   step: Step,
   designDoc: string,
   userMessage: string,
+  relevantFileContents: { name: string; content: string }[],
   generateFile: (response: VscodeResponse) => void,
   updateDesignDoc: (stepToUpdate: Step) => void,
-  readAllFiles: () => Promise<{
-    name: string;
-    content: string;
-  }[]>,
 }) => {
 
-  console.log("About to handle code generation request!");
-
-  const files = await readAllFiles();
-
-  console.log("File Contents: ", files);
+  console.log("Relevant File Contents: ", relevantFileContents);
 
   let fileNames = "Existing Files:";
   let fileContents = "";
-  for (const file of files) {
+  for (const file of relevantFileContents) {
     fileNames += ` ${file.name},`;
     fileContents += `File: ${file.name}\n\n${file.content}\n\n`;
   }
 
-  console.log(fileNames);
-  console.log("File Contents String: ", fileContents);
-
   const codePrompt = `
     You are asked to generate code for ONLY the current step:\n${JSON.stringify(step)}\n\n
-    Try not to generate code for future steps or steps that have already been completed. However, prioritize generating code that is correct and complete for the current step. You may need to reference the existing files included below. You should also add information to the design doc on this step about the new file you've generated.\n\n
+    Try not to generate code for future steps or steps that have already been completed. However, prioritize generating code that is correct and complete for the current step. You may need to reference the existing files included below. If you plan to add to an existing file, make sure to include its current contents in addition to your change. You should also add information to the design doc on this step about the new file you've generated.\n\n
     
     If you can't generate code for this step, add new information on what the project owner can do instead. Or, you may say you're unsure or unable to generate code.\n\n
 
@@ -282,10 +279,12 @@ const handleCodeGenerationRequest = async ({
       "filename": null\n
     }\n
 
-    Here are the existing files in the codebase that you may need to reference:${fileNames}\n\n
+    Here are the existing files in the codebase that you may need to reference. If the file you plan to generate is in the list, make sure to start by copying the file's entire contents and then make the appropriate changes:\n\n
 
     ${fileContents}\n
   `;
+
+  console.log("Code Prompt: ", codePrompt);
 
   const response = await openai.chat.completions.create({
     messages: [
@@ -343,30 +342,30 @@ export const sendMessage = async ({
   step,
   designDoc,
   messages,
+  paths,
+  relevantFileContents,
   /* VSCODE FUNCTIONS */
   generateFile,
   updateDesignDoc,
-  readAllFiles,
+  readRelevantFiles,
 }: {
   command: string;
   userMessage: string;
   step: Step;
   designDoc: string;
   messages: Message[];
+  paths: string[];
+  relevantFileContents: { name: string; content: string }[];
   generateFile: (response: VscodeResponse) => void;
   updateDesignDoc: (stepToUpdate: Step) => void;
-  readAllFiles: () => Promise<{
-    name: string;
-    content: string;
-  }[]>
+  readRelevantFiles: (paths: string[]) => void;
 }): Promise<{
   success: boolean;
   newMessages: Message[];
 }> => {
   switch (command) {
     case "proceed":
-      readAllFiles();
-      return handleInitialDetectiveRequest(step, designDoc);
+      return handleInitialDetectiveRequest(step, designDoc, paths, readRelevantFiles);
     case "add":
       return handleAddInformationRequest({
         messages,
@@ -381,9 +380,9 @@ export const sendMessage = async ({
         step,
         designDoc,
         userMessage,
+        relevantFileContents,
         generateFile,
         updateDesignDoc,
-        readAllFiles,
       });
   }
   
