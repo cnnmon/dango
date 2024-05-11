@@ -344,6 +344,62 @@ async function generateSteps(openai: any) {
   }
 }
 
+//Fethes a list of files relevant to the current task
+async function getRelevantFiles(openai: any, designDoc: string, step: Step) {
+  const paths = await getFileHierarchy();
+
+  const relevantFilesPrompt = `
+    The current list of files in the project is:\n${paths.join('\n')}\n\n
+
+    Please respond with a list of relevant files that you would like to access when generating code for the current step. Each file you include will have its contents pasted for you to access before generating code.\n\n
+
+    You may ONLY respond in the following JSON format:\n
+    {\n
+      "paths": list of strings of relevant file paths\n
+    }\n\n
+
+    An example response is:\n
+    {\n
+      "paths": ["file:///Users/john/projects/game/setup.py", "file:///Users/john/projects/game/play.py"]\n
+    }\n
+  `;
+
+  const response = await openai.chat.completions.create({
+    messages: [
+      {
+        role: "system",
+        content: getInitialPrompt(designDoc, step),
+      },
+      {
+        role: "system",
+        content: relevantFilesPrompt,
+      },
+    ],
+    model: "gpt-4-turbo",
+    response_format: { type: "json_object" },
+  });
+
+  try {
+    const message = response.choices[0]?.message.content;
+    const { paths } = JSON.parse(message as string);
+    console.log("Relevant paths identified: ", paths);
+    const files = await readRelevantFiles(paths);
+    return files;
+  } catch (error) {
+    console.log("Error parsing relevant paths response:", error);
+    return [];
+  }
+}
+
+//Formats file contents to be included in code generation prompt
+function formatFileContents(files) {
+  let fileContents = "";
+  for (const file of files) {
+    fileContents += `File: ${file.name}\n\n${file.content}\n\n`;
+  }
+  return fileContents;
+}
+
 /* Generate code OR add recommendations to design doc OR return a list of questions to ask the user */
 async function generate(openai: any, step: Step) {
   const { number, description } = step;
@@ -359,17 +415,10 @@ async function generate(openai: any, step: Step) {
   }
   outputChannel.appendLine(`Design doc: ${designDoc}`);
 
-  /* File stuff */
-  /*
-  const files = await readAllFiles();
-  let fileNames = "Existing Files:";
-  let fileContents = "";
-  for (const file of files) {
-    fileNames += ` ${file.name},`;
-    fileContents += `File: ${file.name}\n\n${file.content}\n\n`;
-  }
-  outputChannel.appendLine(`Existing files: ${fileNames}`);
-  */
+  /* Grab Relevant Files */
+  const files = await getRelevantFiles(openai, designDoc, step);
+  const fileContents = formatFileContents(files);
+  outputChannel.appendLine(`Relevant files: ${fileContents}`);
 
   /* Prompt */
   const codePrompt = `
@@ -413,11 +462,10 @@ async function generate(openai: any, step: Step) {
       "filename": null,\n
       "questions": ["What programming language should the class be written in?"]\n
     }\n
-  `;
-  /*
-    Here are the existing files in the codebase that you may need to reference:${fileNames}\n\n
+
+    Here are the existing files in the codebase that you may need to reference. If the file you plan to generate is in the list, make sure to start by copying the file's entire contents and then make the appropriate changes:\n\n
     ${fileContents}\n
-  */
+  `;
 
   const response = await openai.chat.completions.create({
     messages: [
