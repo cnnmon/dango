@@ -143,9 +143,9 @@ export default function Chatbox({
             <h1><b>🍡 Dango</b></h1>
             <hr className="my-2" />
             <p className="mt-4">
-              Dango is an AI project co-collaborator powered by a “living design doc” that both you and Dango will work off of to help you powerfully start up projects.
+              Dango is an AI project co-collaborator powered by a “living design doc” that both you and Dango will work off of to help you effectively build, experiment, and create.
               <br /><br />
-              {!designDoc || !steps ? 'To start, make sure you have a design doc in markdown with a # Steps section. Or, let me generate one for you.' : "You're encouraged to look over & modify the design doc to fit your needs at any time. You can refresh Dango's memory by clicking to another tab and back."}
+              {!designDoc || !steps ? 'To start, make sure you have a design doc. I can generate one for you.' : "You're encouraged to look over & modify the design doc to fit your needs at any time. You can refresh Dango's memory by clicking to another tab and back."}
             </p>
           </div>
 

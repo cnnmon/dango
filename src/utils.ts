@@ -12,6 +12,11 @@ export type Message = {
   content: string;
 }
 
+type File = {
+  name: string;
+  content: string;
+}
+
 export const templateDesignDoc = `# Objective
 Develop a digital piano application with distinct soundboard-type audio for each key.
 
@@ -219,7 +224,7 @@ async function updateDesignDoc(steps: Step[]) {
   }
 }
 
-//Return a list of names and contents of all files in the workspace
+// Return a list of names and contents of all files in the workspace
 async function readAllFiles() {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
@@ -230,7 +235,7 @@ async function readAllFiles() {
   const workspacePath = workspaceFolders[0].uri.fsPath; // Get the first workspace folder
   const files = await vscode.workspace.fs.readDirectory(vscode.Uri.file(workspacePath));
 
-  //Create list fileContents that iterates over files and creates an object for each containing name and content
+  // Create list fileContents that iterates over files and creates an object for each containing name and content
   let fileContents = [];
   for (const [name] of files) {
     //Exclude hidden files
@@ -267,7 +272,7 @@ async function readRelevantFiles(paths: string[]) {
     const fileContentBuffer = await vscode.workspace.fs.readFile(fileUri);
     const fileContent = new TextDecoder().decode(fileContentBuffer);
 
-    //Extract relative path from path
+    // Extract relative path from path
     const relativePath = vscode.workspace.asRelativePath(fileUri, false);
 
     fileContents.push({ name: relativePath, content: fileContent });
@@ -344,8 +349,8 @@ async function generateSteps(openai: any) {
   }
 }
 
-//Fethes a list of files relevant to the current task
-async function getRelevantFiles(openai: any, designDoc: string, step: Step) {
+// Fetches a list of files relevant to the current task
+async function getRelevantFiles(openai: any, designDoc: string, step: Step): Promise<File[]> {
   const paths = await getFileHierarchy();
 
   const relevantFilesPrompt = `
@@ -391,8 +396,8 @@ async function getRelevantFiles(openai: any, designDoc: string, step: Step) {
   }
 }
 
-//Formats file contents to be included in code generation prompt
-function formatFileContents(files) {
+// Formats file contents to be included in code generation prompt
+function formatFileContents(files: File[]) {
   let fileContents = "";
   for (const file of files) {
     fileContents += `File: ${file.name}\n\n${file.content}\n\n`;
@@ -508,7 +513,7 @@ async function generate(openai: any, step: Step) {
         newMessages: [
           {
             role: "system",
-            content: `Questions for step ${number}:\n ${questions.join("\n")}. Add these answers to your design doc.`,
+            content: `I have a few questions for step ${number} before I can generate code:\n\n${questions.join("\n")}\n\nAdd these answers to your design doc and refresh to proceed.`,
           },
         ],
       }
@@ -540,8 +545,8 @@ async function generate(openai: any, step: Step) {
         ],
       }
     }
-    await addFile(filename, code);
 
+    await addFile(filename, code);
     return {
       success: true,
       newMessages: [
