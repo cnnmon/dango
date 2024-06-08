@@ -2,6 +2,9 @@
 
 **dango** is a vscode extension meant to act as an intelligent co-collaborator on your creative programming projects.
 
+## demo
+[watch the demo here!](https://vimeo.com/945640739?share=copy)
+
 ## getting started
 see: [the entire "getting started" section](https://code.visualstudio.com/api/get-started/your-first-extension) from the vscode extension api docs
 
@@ -30,10 +33,7 @@ inside **src** is the core vs code extension, and where we'll usually interact w
 - **utils.ts** is a file for helper functions i made to simplify extension.ts. we import from utils.ts into extension.ts
 - **ChatPanel.ts** is a class that enables us to use a customized webview (basically a "window" in vs code)
 
-inside **web** is the React components we'll use as "webviews" (see: [webview api](https://code.visualstudio.com/api/extension-guides/webview)) inside our extension. it's a pretty generic react app, so highly recommend checking out [their own docs which are very good](https://react.dev/learn) to get started.
-
-- **index.tsx / index.html / index.css** are app wrappers, which you probably don't need to touch the majority of the time
-- **App.tsx** is the first page of our React app, and is what shows up on our extension panel currently; we can add more of these in the future to create more pages
+inside **web** is the React components we'll use as "webviews" (see: [webview api](https://code.visualstudio.com/api/extension-guides/webview)) inside our extension.
 
 ### previewing & debugging
 
