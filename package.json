@@ -1,16 +1,15 @@
 {
   "name": "dango",
   "displayName": "dango",
-  "description": "",
+  "description": "Dango is an AI that works with your design doc to build great projects.",
+  "icon": "assets/icon.png",
+  "publisher": "cnnmon",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.87.0"
   },
   "categories": [
     "Other"
-  ],
-  "enabledApiProposals": [
-    "languageModels"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -61,7 +60,7 @@
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
-    "@types/node": "18.x",
+    "@types/node": "^18.19.36",
     "@types/vscode": "^1.87.0",
     "@typescript-eslint/eslint-plugin": "^7.4.0",
     "@typescript-eslint/parser": "^7.4.0",
