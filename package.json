@@ -3,8 +3,12 @@
   "displayName": "dango",
   "description": "Dango is an AI that works with your design doc to build great projects.",
   "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cnnmon/dango.git"
+  },
   "publisher": "cnnmon",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.87.0"
   },
