@@ -2,6 +2,10 @@
 
 **dango** is a vscode extension meant to act as an intelligent co-collaborator on your creative programming projects.
 
+## try it out
+
+[download from the vscode marketplace!](https://marketplace.visualstudio.com/items?itemName=cnnmon.dango)
+
 ## demo
 [watch the demo here!](https://vimeo.com/945640739?share=copy)
 
