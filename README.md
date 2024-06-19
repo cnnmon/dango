@@ -7,7 +7,7 @@
 [download from the vscode marketplace!](https://marketplace.visualstudio.com/items?itemName=cnnmon.dango)
 
 ## demo
-[watch the demo here!](https://vimeo.com/945640739?share=copy)
+[watch the demo here.](https://vimeo.com/945640739?share=copy)
 
 ## getting started
 see: [the entire "getting started" section](https://code.visualstudio.com/api/get-started/your-first-extension) from the vscode extension api docs
