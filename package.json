@@ -1,8 +1,8 @@
 {
   "name": "dango",
   "displayName": "dango",
-  "description": "Dango is an AI that works with your design doc to build great projects.",
-  "icon": "assets/icon.png",
+  "description": "Dango is an AI that works with your design doc to build software quickly and effectively.",
+  "icon": "assets/icon_color.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/cnnmon/dango.git"
