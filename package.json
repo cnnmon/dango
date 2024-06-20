@@ -8,7 +8,7 @@
     "url": "https://github.com/cnnmon/dango.git"
   },
   "publisher": "cnnmon",
-  "version": "0.4.0",
+  "version": "0.6.0",
   "engines": {
     "vscode": "^1.87.0"
   },
