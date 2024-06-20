@@ -8,7 +8,7 @@
     "url": "https://github.com/cnnmon/dango.git"
   },
   "publisher": "cnnmon",
-  "version": "0.7.0",
+  "version": "0.12.0",
   "engines": {
     "vscode": "^1.87.0"
   },
@@ -19,20 +19,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "dango.viewFiles",
-        "title": "Dango: View Files"
-      },
-      {
-        "command": "dango.addFile",
-        "title": "Dango: Add File"
-      },
-      {
         "command": "dango.find",
         "title": "Dango: Find"
-      },
-      {
-        "command": "dango.naruto",
-        "title": "Dango: Naruto"
       }
     ],
     "viewsContainers": {

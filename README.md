@@ -10,7 +10,7 @@ Dango can create and modify the codebase, modify the design doc, ask for clarifi
 
 Simply run ⇧⌘P to bring up the Command Palette. Then, type Dango to find commands; `Dango: Find` should open the webview.
 
-Note that closing the webview
+Note that closing the webview will reset any logs and interrupt any generations in progress. However, you will need to reset the webview if you manually edit your design doc.
 
 <img width="775" alt="image" src="https://github.com/cnnmon/dango/assets/20329981/f6812b20-49f4-4358-84c2-8450ba2b8f69">
 
