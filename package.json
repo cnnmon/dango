@@ -1,7 +1,7 @@
 {
   "name": "dango",
   "displayName": "dango",
-  "description": "Dango is an AI that works with your design doc to build software quickly and effectively.",
+  "description": "Dango is an AI pair programmer that works with your design doc and codebase to give you better code generations.",
   "icon": "assets/icon_color.png",
   "repository": {
     "type": "git",

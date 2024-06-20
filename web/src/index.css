@@ -4,7 +4,7 @@
 
 body {
   background-color: white;
-  font-size: 0.80rem !important;
+  font-size: 0.75rem !important;
   color: black;
 }
 
@@ -29,7 +29,7 @@ button.subtitle:hover {
 }
 
 .subtitle {
-  font-size: 0.75rem !important;
+  font-size: 0.70rem !important;
   color: #878787;
 }
 

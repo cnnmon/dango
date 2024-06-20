@@ -1,14 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Message,
-  getDesignDocConfirmation,
-  sendMessage,
-  userSays,
-  botSays,
   Step,
 } from "./utils/chatService";
 import Chatbox from "./Chatbox";
-import { EXECUTE_PHRASE, parseDesignDoc } from "./utils/utils";
+import { parseDesignDoc } from "./utils/utils";
 
 /* VSCODE FUNCTIONS */
 // @ts-ignore
@@ -86,7 +81,7 @@ function resetSavedMessages() {
   localStorage.removeItem("savedStepMessages");
 }
 
-function saveMessages(stepIdx: number, description: string, messages: Message[]) {
+function saveMessages(stepIdx: number, description: string, messages: string[]) {
   localStorage.setItem("savedStepIdx", stepIdx.toString());
   localStorage.setItem("savedStepDescription", description);
   localStorage.setItem("savedStepMessages", JSON.stringify(messages));
@@ -97,12 +92,11 @@ export default function App() {
   const [designDoc, setDesignDoc] = useState<string | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [currentStepIdx, setCurrentStepIdx] = useState(-1);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<string[]>([]);
   const [isDangoLoading, setIsDangoLoading] = useState(false);
-  const [textareaValue, setTextareaValue] = useState<string>("");
   const messagesEndRef = useRef<null | HTMLDivElement>(null)
 
-  const addMessages = (newMessages: Message[]) => {
+  const addMessages = (newMessages: string[]) => {
     setMessages([...messages, ...newMessages]);
   }
 
@@ -117,11 +111,6 @@ export default function App() {
     setDesignDoc(designDoc);
     const foundSteps = parseDesignDoc(designDoc);
     console.log("Found steps", foundSteps);
-
-    if (!foundSteps.length) {
-      setMessages([botSays(`Design doc found, but unable to read steps. Type <b>${EXECUTE_PHRASE}</b> and I'll generate steps for us to work on. (This might take a few minutes.)`)]);
-      return;
-    }
 
     setSteps(foundSteps);
     
@@ -142,7 +131,6 @@ export default function App() {
     }
 
     // Check if we're navigating to the "currentStepIdx"; if so, load messages from local storage
-    const fallbackMessages = getDesignDocConfirmation(steps[newStep]);
     const { stepIdx, messages } = getSavedMessages(steps);
     if (messages && stepIdx !== null) {
       // If we're navigating to the same step, just load the messages
@@ -153,52 +141,11 @@ export default function App() {
       
       // Else, if there's an existing saved step, notify the user that their conversation will be erased
       setMessages([
-        ...fallbackMessages,
-        botSays(`(NOTE: Chatting will erase your conversation on Step ${stepIdx + 1}.)`)
+        `(NOTE: Working on this step will erase your logs from Step ${stepIdx + 1}.)`
       ]);
     } else {
-      setMessages(fallbackMessages);
+      setMessages([]);
     }
-  }
-
-  const handleUserMessage = async () => {
-    if (!textareaValue) return;
-    setTextareaValue("");
-    const command = textareaValue.toUpperCase().split(" ")[0];
-
-    // Special commands that require async handling
-    const newMessages = [userSays(textareaValue)];
-    addMessages(newMessages);
-    setIsDangoLoading(true);
-    await sendMessage({
-      command,
-      userMessage: textareaValue,
-      currentStepIdx,
-      steps,
-      designDoc,
-      messages,
-      generate, /* VSCODE FUNCTION */
-    }).then((response) => {
-      if (response.success) {
-        newMessages.push(...response.newMessages);
-      } else {
-        newMessages.push(botSays("I'm sorry, I couldn't understand that."));
-      }
-
-      // If new messages are generated, that means we can instantly stop the loading state
-      // Else, we need to wait for vscode to respond
-      const allMessages = [...messages, ...newMessages];
-      if (response.newMessages.length) {
-        setMessages(allMessages);
-        setIsDangoLoading(false);
-      }
-
-      // Only save current step to come back to if you send a message in it
-      if (steps) {
-        const { description } = steps[currentStepIdx];
-        saveMessages(currentStepIdx, description, allMessages);
-      }
-    });
   }
 
   useEffect(() => {
@@ -213,7 +160,7 @@ export default function App() {
           if (value.success) {
             handleDesignDocFound(value.content);
           } else {
-            setMessages([botSays(`No design doc found. Type <b>${EXECUTE_PHRASE}</b> to generate a starter template. Or, create design.md in the root of your workspace.`)]);
+            setMessages(['No design doc found. Type <b>${EXECUTE_PHRASE}</b> to generate a starter template. Or, create design.md in the root of your workspace.']);
           }
           setIsDangoLoading(false);
           break;
@@ -229,7 +176,11 @@ export default function App() {
           break;
         case "generate":
           console.log("Received generated code", value);
-          if (!value.success) return;
+          if (!value.success) {
+            addMessages(["🍡 couldn't generate code for this step. Double check that this is a code generation step, modify your design doc, or try again later."]);
+            setIsDangoLoading(false);
+            return;
+          }
           addMessages(value.newMessages);
           setIsDangoLoading(false);
           break;
@@ -255,9 +206,7 @@ export default function App() {
         steps={steps}
         isDangoLoading={isDangoLoading}
         setIsDangoLoading={setIsDangoLoading}
-        textareaValue={textareaValue}
-        setTextareaValue={setTextareaValue}
-        handleUserMessage={handleUserMessage}
+        handleGoMessage={() => generate(steps[currentStepIdx])}
         handleStepChange={handleStepChange}
         handleDesignDocGeneration={generateTemplateDesignDoc}
         handleStepGeneration={generateStepsAndUpdateDesignDoc}

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { readDesignDoc, addFile, updateDesignDoc, Step, generateSteps, generate, templateDesignDoc, getFileHierarchy, readRelevantFiles } from '../utils';
+import { readDesignDoc, addFile, updateDesignDoc, Step, generateSteps, generate, templateDesignDoc } from '../utils';
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -81,7 +81,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
           });
           break;
         case "generateStepsFromDesignDoc":
-          generateSteps(openai).then((result) => {
+          generateSteps().then((result) => {
             this.postMessageToWebview({
               type: "generateStepsFromDesignDoc",
               value: result
@@ -93,26 +93,6 @@ export class ChatPanel implements vscode.WebviewViewProvider {
             this.postMessageToWebview({
               type: "generate",
               value: result
-            });
-          });
-          break;
-        case "getFileHierarchy":
-          getFileHierarchy().then((result) => {
-            this.postMessageToWebview({
-              type: "getFileHierarchy",
-              value: {
-                paths: result
-              }
-            });
-          });
-        case "readRelevantFiles":
-          const paths = message.value as string[];
-          readRelevantFiles(paths).then((result) => {
-            this.postMessageToWebview({
-              type: "readRelevantFiles",
-              value: {
-                files: result
-              }
             });
           });
           break;

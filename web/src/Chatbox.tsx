@@ -1,5 +1,5 @@
 import React from "react";
-import { Message, Step } from "./utils/chatService";
+import { Step, formatStep } from "./utils/chatService";
 import { ellipses, parseAndFormatMessageText } from "./utils/utils";
 
 function NavButton({ currentStepIdx, steps, handleStepChange, direction }: {
@@ -15,7 +15,7 @@ function NavButton({ currentStepIdx, steps, handleStepChange, direction }: {
       <button
         className={`subtitle`}
         onClick={() => handleStepChange(stepIdx)}>
-        {`← Landing`}
+        {`← Setup`}
       </button>
     )
   }
@@ -68,13 +68,7 @@ function StepFooter({
             <NavButton currentStepIdx={currentStepIdx} steps={steps} handleStepChange={handleStepChange} direction="prev" />
             <NavButton currentStepIdx={currentStepIdx} steps={steps} handleStepChange={handleStepChange} direction="next" />
           </>
-        ) : (
-          <>
-            <p className="subtitle">
-              No steps found.
-            </p>
-          </>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -87,23 +81,19 @@ export default function Chatbox({
   steps,
   isDangoLoading,
   setIsDangoLoading,
-  handleUserMessage,
+  handleGoMessage,
   handleStepChange,
   handleDesignDocGeneration,
   handleStepGeneration,
-  textareaValue,
-  setTextareaValue,
   messagesEndRef,
 }: {
-  messages: Message[],
+  messages: string[],
   designDoc: string | null,
   currentStepIdx: number,
   steps: Step[],
   isDangoLoading: boolean,
   setIsDangoLoading: React.Dispatch<React.SetStateAction<boolean>>,
-  textareaValue: string,
-  setTextareaValue: React.Dispatch<React.SetStateAction<string>>,
-  handleUserMessage: () => void,
+  handleGoMessage: () => void,
   handleStepChange: (newStep: number) => void,
   handleDesignDocGeneration: () => void,
   handleStepGeneration: () => void,
@@ -117,7 +107,7 @@ export default function Chatbox({
     if (isDangoLoading) {
       return (
         <p className="underline gray cursor-not-allowed">
-          🍡 is thinking... {possiblyLong && "(may take a few minutes)"}
+          🍡 is thinking... {possiblyLong && "(may take a few minutes, don't click away!)"}
         </p>
       )
     }
@@ -143,9 +133,9 @@ export default function Chatbox({
             <h1><b>🍡 Dango</b></h1>
             <hr className="my-2" />
             <p className="mt-4">
-              Dango is an AI project co-collaborator powered by a “living design doc” that both you and Dango will work off of to help you effectively build, experiment, and create.
+              Dango is an AI pair programmer that works with your design doc and codebase to give you better code generations.
               <br /><br />
-              {!designDoc || !steps ? 'To start, make sure you have a design doc. I can generate one for you.' : "You're encouraged to look over & modify the design doc to fit your needs at any time. You can refresh Dango's memory by clicking to another tab and back."}
+              To start, make sure you're in the right project directory. We'll start by ensuring you have a design doc named design.md at root, with a section for steps. Then, we'll walk through each step together.
             </p>
           </div>
 
@@ -153,11 +143,11 @@ export default function Chatbox({
             <b>📝 Design Doc</b>{'  '}
             {designDoc ? (
               <>
-                Located design.md!
+                Located design.md! Update it to reflect whatever project you want to work on.
               </>
             ) : (
               <>
-                No design.md found at root. <LoadingLink label="Generate one!" onClickHandler={handleDesignDocGeneration} />
+                No design.md found at root. <LoadingLink label="Create one from a template!" onClickHandler={handleDesignDocGeneration} />
               </>
             )}
           </p>
@@ -180,7 +170,7 @@ export default function Chatbox({
                 </>
               ) : (
                 <>
-                  No steps found. <LoadingLink label="Generate steps!" onClickHandler={handleStepGeneration} possiblyLong />
+                  No steps found. <LoadingLink label="Generate example steps from a template!" onClickHandler={handleStepGeneration} />
                 </>
               )}
 
@@ -197,32 +187,30 @@ export default function Chatbox({
     )
   }
 
+  const step = steps[currentStepIdx];
+
   return (
     <>
-      <div className="flex flex-col gap-2 mb-2 h-[70vh] min-h-[70vh] max-h-[70vh] overflow-y-auto">
+      <div className="flex flex-col gap-2 mb-2 h-[79h] min-h-[79vh] max-h-[79vh] overflow-y-auto">
+        <h1><b>🍡 Dango</b>: Step {step.number} Logs</h1>
+        <hr className="my-2" />
+        <p>We are currently working on <b>{formatStep(step)}</b></p>
         {messages.map((message, idx) => (
-          <div key={idx} className={`flex flex-row whitespace-pre-wrap items-center gap-2 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
-            <span className="text-lg">{message.role === "user" ? "🧍" : "🍡"}</span>
-            <div className="p-2 rounded-md bg-gray-200 flex-1 text-black">
-              {parseAndFormatMessageText(message.content)}
-            </div>
+          <div key={idx} className="mb-2">
+            {parseAndFormatMessageText(message)}
           </div>
         ))}
         <div ref={messagesEndRef} className="h-1 w-0"></div>
       </div>
 
-      <textarea
-        className="bg-white p-2 w-full resize-none text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-        placeholder="Say something..."
-        value={textareaValue}
-        onChange={(e) => setTextareaValue(e.target.value)}
-      />
-      
       <button
-        className={`submit-button align-middle select-none font-bold text-center uppercase transition-all disabled:opacity-50 disabled:shadow-none disabled:pointer-events-none py-2 px-6 rounded-lg bg-gray-900 text-white shadow-md shadow-gray-900/10 hover:shadow-lg hover:shadow-gray-900/20 focus:opacity-[0.85] focus:shadow-none active:opacity-[0.85] active:shadow-none w-full ${isDangoLoading || !textareaValue ? "cursor-not-allowed bg-gray-400" : ""}`} 
-        disabled={isDangoLoading || !textareaValue}
-        onClick={handleUserMessage}>
-        {isDangoLoading ? "🍡 is thinking..." : "Submit"}
+        className={`submit-button align-middle select-none font-bold text-center uppercase transition-all disabled:opacity-50 disabled:shadow-none disabled:pointer-events-none py-2 px-6 rounded-lg bg-gray-900 text-white shadow-md shadow-gray-900/10 hover:shadow-lg hover:shadow-gray-900/20 focus:opacity-[0.85] focus:shadow-none active:opacity-[0.85] active:shadow-none w-full ${isDangoLoading ? "cursor-not-allowed bg-gray-400" : ""}`} 
+        disabled={isDangoLoading}
+        onClick={() => {
+          setIsDangoLoading(true);
+          handleGoMessage();
+        }}>
+        {isDangoLoading ? "🍡 is thinking..." : "work on this step!"}
       </button>
 
       <StepFooter
