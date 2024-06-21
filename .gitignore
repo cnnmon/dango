@@ -3,5 +3,6 @@ dist
 node_modules
 .vscode-test/
 *.vsix
-.vscode
+.vscode/
+.vscode/launch.json
 web/.parcel-cache/
