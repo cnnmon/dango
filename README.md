@@ -4,7 +4,7 @@ Dango is a VS Code extension enabling user and AI to collaborate on a "living de
 
 Dango can create and modify the codebase, modify the design doc, ask for clarifications, and more.
 
-[Read about the HCI methods we used to build Dango.](https://drive.google.com/file/d/1RyZyIDf4amJ7UfOKC81lgiIS7J8vmtWC/view)
+[Read about the HCI methods we used to build Dango.](https://drive.google.com/file/d/1L9hbCK6j5lHo6sMCb29kYXOEPmc_awkW/view?usp=sharing)
 
 Or, [watch Dango in action!](https://vimeo.com/945640739?share=copy)
 
